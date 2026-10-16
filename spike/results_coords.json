@@ -1,0 +1,298 @@
+{
+ "physical_targets": {
+  "alpha": [
+   335,
+   295
+  ],
+  "beta": [
+   685,
+   520
+  ],
+  "gamma": [
+   460,
+   695
+  ]
+ },
+ "buttons_uia_aware": {
+  "alpha": {
+   "left": 210,
+   "top": 239,
+   "right": 460,
+   "bottom": 352,
+   "center": [
+    335,
+    295
+   ]
+  },
+  "beta": {
+   "left": 560,
+   "top": 464,
+   "right": 810,
+   "bottom": 577,
+   "center": [
+    685,
+    520
+   ]
+  },
+  "gamma": {
+   "left": 335,
+   "top": 639,
+   "right": 585,
+   "bottom": 752,
+   "center": [
+    460,
+    695
+   ]
+  }
+ },
+ "window_win32_aware": {
+  "left": 175,
+  "top": 175,
+  "right": 1300,
+  "bottom": 875
+ },
+ "variants": {
+  "unaware": {
+   "variant": "unaware",
+   "dpi_call": "не вызывался",
+   "process_dpi": {
+    "awareness_code": 0,
+    "foreground_dpi": 96
+   },
+   "metrics": {
+    "screen": [
+     1536,
+     864
+    ],
+    "virtual": [
+     0,
+     0,
+     1536,
+     864
+    ]
+   },
+   "buttons_uia": {
+    "alpha": {
+     "left": 168,
+     "top": 191,
+     "right": 368,
+     "bottom": 281,
+     "center": [
+      268,
+      236
+     ]
+    },
+    "beta": {
+     "left": 448,
+     "top": 371,
+     "right": 648,
+     "bottom": 461,
+     "center": [
+      548,
+      416
+     ]
+    },
+    "gamma": {
+     "left": 268,
+     "top": 511,
+     "right": 468,
+     "bottom": 601,
+     "center": [
+      368,
+      556
+     ]
+    }
+   },
+   "activated": true,
+   "clicks": [
+    {
+     "target_name": "alpha",
+     "physical_target": [
+      335,
+      295
+     ],
+     "normalized": [
+      14302,
+      22402
+     ],
+     "moved": true,
+     "landed": [
+      335,
+      295
+     ],
+     "cursor_expected": [
+      335,
+      295
+     ],
+     "log": "MISS px=335,295",
+     "ok": false
+    },
+    {
+     "target_name": "beta",
+     "physical_target": [
+      685,
+      520
+     ],
+     "normalized": [
+      29245,
+      39488
+     ],
+     "moved": true,
+     "landed": [
+      685,
+      521
+     ],
+     "cursor_expected": [
+      685,
+      520
+     ],
+     "log": "MISS px=685,521",
+     "ok": false
+    },
+    {
+     "target_name": "gamma",
+     "physical_target": [
+      460,
+      695
+     ],
+     "normalized": [
+      19639,
+      52777
+     ],
+     "moved": true,
+     "landed": [
+      460,
+      696
+     ],
+     "cursor_expected": [
+      460,
+      695
+     ],
+     "log": "<промах: окно ничего не получило>",
+     "ok": false
+    }
+   ]
+  },
+  "v2": {
+   "variant": "v2",
+   "dpi_call": "PER_MONITOR_AWARE_V2",
+   "process_dpi": {
+    "awareness_code": 2,
+    "foreground_dpi": 96
+   },
+   "metrics": {
+    "screen": [
+     1920,
+     1080
+    ],
+    "virtual": [
+     0,
+     0,
+     1920,
+     1080
+    ]
+   },
+   "buttons_uia": {
+    "alpha": {
+     "left": 210,
+     "top": 239,
+     "right": 460,
+     "bottom": 352,
+     "center": [
+      335,
+      295
+     ]
+    },
+    "beta": {
+     "left": 560,
+     "top": 464,
+     "right": 810,
+     "bottom": 577,
+     "center": [
+      685,
+      520
+     ]
+    },
+    "gamma": {
+     "left": 335,
+     "top": 639,
+     "right": 585,
+     "bottom": 752,
+     "center": [
+      460,
+      695
+     ]
+    }
+   },
+   "activated": true,
+   "clicks": [
+    {
+     "target_name": "alpha",
+     "physical_target": [
+      335,
+      295
+     ],
+     "normalized": [
+      11440,
+      17917
+     ],
+     "moved": true,
+     "landed": [
+      335,
+      295
+     ],
+     "cursor_expected": [
+      335,
+      295
+     ],
+     "log": "CLICK alpha px=268,236",
+     "ok": true
+    },
+    {
+     "target_name": "beta",
+     "physical_target": [
+      685,
+      520
+     ],
+     "normalized": [
+      23393,
+      31583
+     ],
+     "moved": true,
+     "landed": [
+      685,
+      520
+     ],
+     "cursor_expected": [
+      685,
+      520
+     ],
+     "log": "CLICK beta px=548,416",
+     "ok": true
+    },
+    {
+     "target_name": "gamma",
+     "physical_target": [
+      460,
+      695
+     ],
+     "normalized": [
+      15709,
+      42212
+     ],
+     "moved": true,
+     "landed": [
+      460,
+      695
+     ],
+     "cursor_expected": [
+      460,
+      695
+     ],
+     "log": "CLICK gamma px=368,557",
+     "ok": true
+    }
+   ]
+  }
+ }
+}

@@ -1,0 +1,71 @@
+{
+ "dpi_awareness": "PER_MONITOR_AWARE_V2",
+ "monitor": {
+  "handle": 65537,
+  "dpi": 120,
+  "scale_percent": 125,
+  "cursor": [
+   730,
+   513
+  ]
+ },
+ "ms_dxcam_create": 105.36,
+ "ms_first_frame": 7.86,
+ "frame_shape": [
+  1080,
+  1920,
+  4
+ ],
+ "frame_copy": {
+  "count": 200,
+  "ms_min": 1.277,
+  "ms_median": 1.423,
+  "ms_p95": 1.791,
+  "ms_max": 1.994
+ },
+ "cropped_window": {
+  "left": 993,
+  "top": 296,
+  "right": 1821,
+  "bottom": 924,
+  "exe": "Notepad.exe",
+  "title": "Александр_Недяк_0x57538F6FF3C95DE2_public.asc — Блокнот"
+ },
+ "ms_crop": {
+  "count": 50,
+  "ms_min": 0.457,
+  "ms_median": 0.54,
+  "ms_p95": 0.623,
+  "ms_max": 0.961
+ },
+ "grab": {
+  "count": 1,
+  "ms_min": 8.035,
+  "ms_median": 8.035,
+  "ms_p95": 8.035,
+  "ms_max": 8.035,
+  "empty_frames": 299,
+  "shape": null
+ },
+ "latest_frame": {
+  "count": 300,
+  "ms_min": 1.758,
+  "ms_median": 8.332,
+  "ms_p95": 8.997,
+  "ms_max": 10.544,
+  "empty_frames": 0,
+  "cpu_percent_while_capturing": 14.1
+ },
+ "continuous": {
+  "frames": 242,
+  "seconds": 2.0,
+  "fps": 120.8
+ },
+ "mss": {
+  "count": 75,
+  "ms_min": 16.521,
+  "ms_median": 33.006,
+  "ms_p95": 36.198,
+  "ms_max": 44.733
+ }
+}

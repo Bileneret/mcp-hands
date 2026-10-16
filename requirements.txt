@@ -1,0 +1,19 @@
+# Зависимости MCP-Hands.
+# Установка: py -3 -m venv .venv && .venv\Scripts\python -m pip install -r requirements.txt
+#
+# Windows-only проект: все библиотеки ниже работают через Win32/COM.
+
+# Доступ к UI Automation и Win32 API (глаза, руки, события)
+comtypes==1.4.17
+pywin32==312
+
+# Пиксельный путь: работа с кадрами и сохранение PNG
+numpy==2.5.4
+pillow==13.0.0
+
+# Захват экрана: DXGI Desktop Duplication.
+# Нативная выдача — BGRA, конвертация делается срезом numpy (cv2 не нужен).
+dxcam==0.3.0
+
+# Захват через BitBlt — только для сравнения в замерах спайка (spike/capture_dxgi.py)
+mss==10.2.0
