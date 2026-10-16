@@ -1,0 +1,2503 @@
+{
+ "generated": "2026-10-17 02:17:51",
+ "depth": 3,
+ "targets": {
+  "Notepad.exe": {
+   "cached": {
+    "mode": "cached",
+    "runs": 2,
+    "elements": 29,
+    "ms_min": 55.4,
+    "ms_median": 56.1,
+    "ms_max": 56.8,
+    "ms_per_element": 1.934,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 5,
+      "ms": 53.45,
+      "ms_per_parent": 53.45
+     },
+     {
+      "level": 2,
+      "parents": 5,
+      "elements": 8,
+      "ms": 0.06,
+      "ms_per_parent": 0.01
+     },
+     {
+      "level": 3,
+      "parents": 8,
+      "elements": 16,
+      "ms": 0.06,
+      "ms_per_parent": 0.01
+     }
+    ],
+    "nodes_dumped": 29,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NotepadTextBox",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 7079504,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 13895348,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2496798,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2491552,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_TitleBarControlTypeId",
+      "localized_type": "название",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "Редактор текста",
+      "automation_id": "",
+      "class_name": "RichEditD2DPT",
+      "control_type": "UIA_DocumentControlTypeId",
+      "localized_type": "документ",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 5571914,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 5899196,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 10158608,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 1246340,
+      "level": 2
+     },
+     {
+      "name": "Система",
+      "automation_id": "MenuBar",
+      "class_name": "",
+      "control_type": "UIA_MenuBarControlTypeId",
+      "localized_type": "строка меню",
+      "rect": [
+       1002,
+       305,
+       1030,
+       333
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Свернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1635,
+       297,
+       1695,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Развернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1695,
+       297,
+       1754,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     }
+    ]
+   },
+   "perparent": {
+    "mode": "perparent",
+    "runs": 2,
+    "elements": 29,
+    "ms_min": 80.1,
+    "ms_median": 103.1,
+    "ms_max": 126.0,
+    "ms_per_element": 3.554,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 5,
+      "ms": 36.38,
+      "ms_per_parent": 36.38
+     },
+     {
+      "level": 2,
+      "parents": 5,
+      "elements": 8,
+      "ms": 25.36,
+      "ms_per_parent": 5.07
+     },
+     {
+      "level": 3,
+      "parents": 8,
+      "elements": 16,
+      "ms": 15.85,
+      "ms_per_parent": 1.98
+     }
+    ],
+    "nodes_dumped": 29,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NotepadTextBox",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 7079504,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 13895348,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2496798,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2491552,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_TitleBarControlTypeId",
+      "localized_type": "название",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "Редактор текста",
+      "automation_id": "",
+      "class_name": "RichEditD2DPT",
+      "control_type": "UIA_DocumentControlTypeId",
+      "localized_type": "документ",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 5571914,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 5899196,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 10158608,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 1246340,
+      "level": 2
+     },
+     {
+      "name": "Система",
+      "automation_id": "MenuBar",
+      "class_name": "",
+      "control_type": "UIA_MenuBarControlTypeId",
+      "localized_type": "строка меню",
+      "rect": [
+       1002,
+       305,
+       1030,
+       333
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Свернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1635,
+       297,
+       1695,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Развернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1695,
+       297,
+       1754,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     }
+    ]
+   },
+   "naive": {
+    "mode": "naive",
+    "runs": 2,
+    "elements": 29,
+    "ms_min": 65.4,
+    "ms_median": 78.0,
+    "ms_max": 90.5,
+    "ms_per_element": 2.688,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 5,
+      "ms": 10.63,
+      "ms_per_parent": 10.63
+     },
+     {
+      "level": 2,
+      "parents": 5,
+      "elements": 8,
+      "ms": 12.71,
+      "ms_per_parent": 2.54
+     },
+     {
+      "level": 3,
+      "parents": 8,
+      "elements": 16,
+      "ms": 6.6,
+      "ms_per_parent": 0.83
+     }
+    ],
+    "nodes_dumped": 29,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NotepadTextBox",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 7079504,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 13895348,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2496798,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2491552,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_TitleBarControlTypeId",
+      "localized_type": "название",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "Редактор текста",
+      "automation_id": "",
+      "class_name": "RichEditD2DPT",
+      "control_type": "UIA_DocumentControlTypeId",
+      "localized_type": "документ",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 5571914,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 5899196,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 10158608,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 1246340,
+      "level": 2
+     },
+     {
+      "name": "Система",
+      "automation_id": "MenuBar",
+      "class_name": "",
+      "control_type": "UIA_MenuBarControlTypeId",
+      "localized_type": "строка меню",
+      "rect": [
+       1002,
+       305,
+       1030,
+       333
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Свернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1635,
+       297,
+       1695,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Развернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1695,
+       297,
+       1754,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     }
+    ]
+   },
+   "descendants": {
+    "mode": "descendants",
+    "runs": 2,
+    "elements": 53,
+    "ms_min": 117.4,
+    "ms_median": 122.5,
+    "ms_max": 127.7,
+    "ms_per_element": 2.312,
+    "levels": [
+     {
+      "level": "all",
+      "parents": 1,
+      "elements": 53,
+      "ms": 123.79,
+      "ms_per_parent": 123.79
+     }
+    ],
+    "nodes_dumped": 53,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NotepadTextBox",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 7079504,
+      "level": 0
+     },
+     {
+      "name": "Редактор текста",
+      "automation_id": "",
+      "class_name": "RichEditD2DPT",
+      "control_type": "UIA_DocumentControlTypeId",
+      "localized_type": "документ",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 5571914,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 13895348,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 5899196,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "Tabs",
+      "class_name": "Microsoft.UI.Xaml.Controls.TabView",
+      "control_type": "UIA_TabControlTypeId",
+      "localized_type": "вкладка",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "TabListView",
+      "class_name": "ListView",
+      "control_type": "UIA_ListControlTypeId",
+      "localized_type": "список",
+      "rect": [
+       1053,
+       308,
+       1545,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Human Writing.md. Не изменено.",
+      "automation_id": "",
+      "class_name": "ListViewItem",
+      "control_type": "UIA_TabItemControlTypeId",
+      "localized_type": "элемент вкладки",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Human Writing.md",
+      "automation_id": "",
+      "class_name": "TextBlock",
+      "control_type": "UIA_TextControlTypeId",
+      "localized_type": "текст",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "ARGON_PATCH_REPORT.md. Не изменено.",
+      "automation_id": "",
+      "class_name": "ListViewItem",
+      "control_type": "UIA_TabItemControlTypeId",
+      "localized_type": "элемент вкладки",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "ARGON_PATCH_REPORT.md",
+      "automation_id": "",
+      "class_name": "TextBlock",
+      "control_type": "UIA_TextControlTypeId",
+      "localized_type": "текст",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "build.gradle.kts. Не изменено.",
+      "automation_id": "",
+      "class_name": "ListViewItem",
+      "control_type": "UIA_TabItemControlTypeId",
+      "localized_type": "элемент вкладки",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "build.gradle.kts",
+      "automation_id": "",
+      "class_name": "TextBlock",
+      "control_type": "UIA_TextControlTypeId",
+      "localized_type": "текст",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     }
+    ]
+   }
+  },
+  "opera.exe": {
+   "cached": {
+    "mode": "cached",
+    "runs": 2,
+    "elements": 4,
+    "ms_min": 75.0,
+    "ms_median": 76.2,
+    "ms_max": 77.3,
+    "ms_per_element": 19.039,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 2,
+      "ms": 74.13,
+      "ms_per_parent": 74.13
+     },
+     {
+      "level": 2,
+      "parents": 2,
+      "elements": 1,
+      "ms": 0.03,
+      "ms_per_parent": 0.01
+     },
+     {
+      "level": 3,
+      "parents": 1,
+      "elements": 1,
+      "ms": 0.01,
+      "ms_per_parent": 0.01
+     }
+    ],
+    "nodes_dumped": 4,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Intermediate D3D Window",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25112,
+      "framework": "Win32",
+      "hwnd": 4982606,
+      "level": 1
+     },
+     {
+      "name": "Стратегия продвижения инженерных кейсов - Google Gemini - Opera",
+      "automation_id": "",
+      "class_name": "RootView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NonClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Неклиентская область браузера",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "perparent": {
+    "mode": "perparent",
+    "runs": 2,
+    "elements": 4,
+    "ms_min": 216.3,
+    "ms_median": 217.2,
+    "ms_max": 218.0,
+    "ms_per_element": 54.289,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 2,
+      "ms": 75.21,
+      "ms_per_parent": 75.21
+     },
+     {
+      "level": 2,
+      "parents": 2,
+      "elements": 1,
+      "ms": 65.41,
+      "ms_per_parent": 32.71
+     },
+     {
+      "level": 3,
+      "parents": 1,
+      "elements": 1,
+      "ms": 67.04,
+      "ms_per_parent": 67.04
+     }
+    ],
+    "nodes_dumped": 4,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Intermediate D3D Window",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25112,
+      "framework": "Win32",
+      "hwnd": 4982606,
+      "level": 1
+     },
+     {
+      "name": "Стратегия продвижения инженерных кейсов - Google Gemini - Opera",
+      "automation_id": "",
+      "class_name": "RootView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NonClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Неклиентская область браузера",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "naive": {
+    "mode": "naive",
+    "runs": 2,
+    "elements": 4,
+    "ms_min": 15.9,
+    "ms_median": 17.3,
+    "ms_max": 18.6,
+    "ms_per_element": 4.319,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 2,
+      "ms": 6.4,
+      "ms_per_parent": 6.4
+     },
+     {
+      "level": 2,
+      "parents": 2,
+      "elements": 1,
+      "ms": 2.23,
+      "ms_per_parent": 1.11
+     },
+     {
+      "level": 3,
+      "parents": 1,
+      "elements": 1,
+      "ms": 0.23,
+      "ms_per_parent": 0.23
+     }
+    ],
+    "nodes_dumped": 4,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Intermediate D3D Window",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25112,
+      "framework": "Win32",
+      "hwnd": 4982606,
+      "level": 1
+     },
+     {
+      "name": "Стратегия продвижения инженерных кейсов - Google Gemini - Opera",
+      "automation_id": "",
+      "class_name": "RootView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NonClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Неклиентская область браузера",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "descendants": {
+    "mode": "descendants",
+    "runs": 2,
+    "elements": 538,
+    "ms_min": 1611.5,
+    "ms_median": 1611.9,
+    "ms_max": 1612.3,
+    "ms_per_element": 2.996,
+    "levels": [
+     {
+      "level": "all",
+      "parents": 1,
+      "elements": 538,
+      "ms": 1548.73,
+      "ms_per_parent": 1548.73
+     }
+    ],
+    "nodes_dumped": 200,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Intermediate D3D Window",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25112,
+      "framework": "Win32",
+      "hwnd": 4982606,
+      "level": 0
+     },
+     {
+      "name": "Стратегия продвижения инженерных кейсов - Google Gemini - Opera",
+      "automation_id": "",
+      "class_name": "RootView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NonClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Неклиентская область браузера",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Клиентская область браузера",
+      "automation_id": "",
+      "class_name": "BrowserClientViewGx",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "PanelsHostView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "LiveBackgroundView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "WindowDecoratorGx",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "TranslucentBackgroundView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "SidebarItemContentViewDockerViewGx",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "View",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       51,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "HorizontalSplitView",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       51,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     }
+    ]
+   }
+  },
+  "Antigravity.exe": {
+   "cached": {
+    "mode": "cached",
+    "runs": 2,
+    "elements": 4,
+    "ms_min": 92.3,
+    "ms_median": 101.5,
+    "ms_max": 110.8,
+    "ms_per_element": 25.386,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 2,
+      "ms": 106.85,
+      "ms_per_parent": 106.85
+     },
+     {
+      "level": 2,
+      "parents": 2,
+      "elements": 1,
+      "ms": 0.03,
+      "ms_per_parent": 0.01
+     },
+     {
+      "level": 3,
+      "parents": 1,
+      "elements": 1,
+      "ms": 0.01,
+      "ms_per_parent": 0.01
+     }
+    ],
+    "nodes_dumped": 4,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Intermediate D3D Window",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 1692,
+      "framework": "Win32",
+      "hwnd": 10158624,
+      "level": 1
+     },
+     {
+      "name": "GitHub Repository Audit A...",
+      "automation_id": "",
+      "class_name": "RootView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NonClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "WinFrameView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "perparent": {
+    "mode": "perparent",
+    "runs": 2,
+    "elements": 4,
+    "ms_min": 302.6,
+    "ms_median": 325.5,
+    "ms_max": 348.4,
+    "ms_per_element": 81.375,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 2,
+      "ms": 100.71,
+      "ms_per_parent": 100.71
+     },
+     {
+      "level": 2,
+      "parents": 2,
+      "elements": 1,
+      "ms": 109.66,
+      "ms_per_parent": 54.83
+     },
+     {
+      "level": 3,
+      "parents": 1,
+      "elements": 1,
+      "ms": 80.02,
+      "ms_per_parent": 80.02
+     }
+    ],
+    "nodes_dumped": 4,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Intermediate D3D Window",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 1692,
+      "framework": "Win32",
+      "hwnd": 10158624,
+      "level": 1
+     },
+     {
+      "name": "GitHub Repository Audit A...",
+      "automation_id": "",
+      "class_name": "RootView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NonClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "WinFrameView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "naive": {
+    "mode": "naive",
+    "runs": 2,
+    "elements": 4,
+    "ms_min": 16.4,
+    "ms_median": 20.0,
+    "ms_max": 23.6,
+    "ms_per_element": 5.001,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 2,
+      "ms": 8.21,
+      "ms_per_parent": 8.21
+     },
+     {
+      "level": 2,
+      "parents": 2,
+      "elements": 1,
+      "ms": 4.03,
+      "ms_per_parent": 2.01
+     },
+     {
+      "level": 3,
+      "parents": 1,
+      "elements": 1,
+      "ms": 0.36,
+      "ms_per_parent": 0.36
+     }
+    ],
+    "nodes_dumped": 4,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Intermediate D3D Window",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 1692,
+      "framework": "Win32",
+      "hwnd": 10158624,
+      "level": 1
+     },
+     {
+      "name": "GitHub Repository Audit A...",
+      "automation_id": "",
+      "class_name": "RootView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NonClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "WinFrameView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "descendants": {
+    "mode": "descendants",
+    "runs": 2,
+    "elements": 778,
+    "ms_min": 1669.3,
+    "ms_median": 1702.1,
+    "ms_max": 1734.9,
+    "ms_per_element": 2.188,
+    "levels": [
+     {
+      "level": "all",
+      "parents": 1,
+      "elements": 778,
+      "ms": 1600.89,
+      "ms_per_parent": 1600.89
+     }
+    ],
+    "nodes_dumped": 200,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Intermediate D3D Window",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 1692,
+      "framework": "Win32",
+      "hwnd": 10158624,
+      "level": 0
+     },
+     {
+      "name": "GitHub Repository Audit A...",
+      "automation_id": "",
+      "class_name": "RootView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NonClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "WinFrameView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "WinCaptionButtonContainer",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       1749,
+       0,
+       1921,
+       38
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Свернуть",
+      "automation_id": "",
+      "class_name": "WinCaptionButton",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1749,
+       0,
+       1806,
+       38
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Восстановить",
+      "automation_id": "",
+      "class_name": "WinCaptionButton",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1805,
+       0,
+       1863,
+       38
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Закрыть",
+      "automation_id": "",
+      "class_name": "WinCaptionButton",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1863,
+       0,
+       1921,
+       38
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "ClientView",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "View",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "View",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "View",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     }
+    ]
+   }
+  }
+ },
+ "hang": null
+}

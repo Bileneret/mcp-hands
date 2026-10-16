@@ -1,0 +1,139 @@
+{
+ "fixture_pid": 9976,
+ "hwnd": "0x9d059c",
+ "with_budget": {
+  "killed": true,
+  "wall_ms": 523.1,
+  "returncode": 1,
+  "stdout_tail": "",
+  "stderr_tail": "",
+  "payload": null
+ },
+ "no_guard": {
+  "killed": true,
+  "wall_ms": 45021.2,
+  "returncode": 1,
+  "stdout_tail": "",
+  "stderr_tail": "",
+  "payload": null
+ },
+ "connection_timeout": {
+  "200": {
+   "killed": false,
+   "wall_ms": 517.3,
+   "returncode": 0,
+   "stdout_tail": "",
+   "stderr_tail": "",
+   "payload": {
+    "target": {
+     "hwnd": "0x9d059c",
+     "pid": 9976,
+     "exe": "python.exe",
+     "title": "MCP-Hands hang fixture",
+     "rect": {
+      "left": 75,
+      "top": 75,
+      "right": 620,
+      "bottom": 399
+     }
+    },
+    "mode": "cached",
+    "profile": "action",
+    "with_patterns": false,
+    "depth": 3,
+    "dpi_awareness": "PER_MONITOR_AWARE_V2",
+    "connection_timeout_ms": 200,
+    "ms_element_from_handle": 216.68,
+    "content_root": {
+     "how": "none"
+    },
+    "levels": [],
+    "total_elements": 0,
+    "nodes_dumped": 0,
+    "ms_walk": 216.69,
+    "ms_total": 216.69,
+    "ms_per_element": 216.693,
+    "error": "element_from_handle: COMError: (-2147023436, 'Возврат из операции произошел из-за превышения времени ожидания.', (None, None, None, 0, None))",
+    "nodes": []
+   }
+  },
+  "500": {
+   "killed": false,
+   "wall_ms": 831.9,
+   "returncode": 0,
+   "stdout_tail": "",
+   "stderr_tail": "",
+   "payload": {
+    "target": {
+     "hwnd": "0x9d059c",
+     "pid": 9976,
+     "exe": "python.exe",
+     "title": "MCP-Hands hang fixture",
+     "rect": {
+      "left": 75,
+      "top": 75,
+      "right": 620,
+      "bottom": 399
+     }
+    },
+    "mode": "cached",
+    "profile": "action",
+    "with_patterns": false,
+    "depth": 3,
+    "dpi_awareness": "PER_MONITOR_AWARE_V2",
+    "connection_timeout_ms": 500,
+    "ms_element_from_handle": 517.07,
+    "content_root": {
+     "how": "none"
+    },
+    "levels": [],
+    "total_elements": 0,
+    "nodes_dumped": 0,
+    "ms_walk": 517.09,
+    "ms_total": 517.09,
+    "ms_per_element": 517.088,
+    "error": "element_from_handle: COMError: (-2147023436, 'Возврат из операции произошел из-за превышения времени ожидания.', (None, None, None, 0, None))",
+    "nodes": []
+   }
+  },
+  "1000": {
+   "killed": false,
+   "wall_ms": 1355.0,
+   "returncode": 0,
+   "stdout_tail": "",
+   "stderr_tail": "",
+   "payload": {
+    "target": {
+     "hwnd": "0x9d059c",
+     "pid": 9976,
+     "exe": "python.exe",
+     "title": "MCP-Hands hang fixture",
+     "rect": {
+      "left": 75,
+      "top": 75,
+      "right": 620,
+      "bottom": 399
+     }
+    },
+    "mode": "cached",
+    "profile": "action",
+    "with_patterns": false,
+    "depth": 3,
+    "dpi_awareness": "PER_MONITOR_AWARE_V2",
+    "connection_timeout_ms": 1000,
+    "ms_element_from_handle": 1028.01,
+    "content_root": {
+     "how": "none"
+    },
+    "levels": [],
+    "total_elements": 0,
+    "nodes_dumped": 0,
+    "ms_walk": 1028.03,
+    "ms_total": 1028.03,
+    "ms_per_element": 1028.032,
+    "error": "element_from_handle: COMError: (-2147023436, 'Возврат из операции произошел из-за превышения времени ожидания.', (None, None, None, 0, None))",
+    "nodes": []
+   }
+  }
+ }
+}

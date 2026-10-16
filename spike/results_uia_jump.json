@@ -1,0 +1,3457 @@
+{
+ "generated": "2026-10-17 02:19:37",
+ "depth": 3,
+ "jump": "auto",
+ "targets": {
+  "Notepad.exe": {
+   "cached": {
+    "mode": "cached",
+    "runs": 2,
+    "elements": 29,
+    "ms_min": 52.4,
+    "ms_median": 53.5,
+    "ms_max": 54.6,
+    "ms_per_element": 1.844,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 5,
+      "ms": 49.19,
+      "ms_per_parent": 49.19
+     },
+     {
+      "level": 2,
+      "parents": 5,
+      "elements": 8,
+      "ms": 0.07,
+      "ms_per_parent": 0.01
+     },
+     {
+      "level": 3,
+      "parents": 8,
+      "elements": 16,
+      "ms": 0.06,
+      "ms_per_parent": 0.01
+     }
+    ],
+    "nodes_dumped": 29,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NotepadTextBox",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 7079504,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 13895348,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2496798,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2491552,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_TitleBarControlTypeId",
+      "localized_type": "название",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "Редактор текста",
+      "automation_id": "",
+      "class_name": "RichEditD2DPT",
+      "control_type": "UIA_DocumentControlTypeId",
+      "localized_type": "документ",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 5571914,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 5899196,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 10158608,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 1246340,
+      "level": 2
+     },
+     {
+      "name": "Система",
+      "automation_id": "MenuBar",
+      "class_name": "",
+      "control_type": "UIA_MenuBarControlTypeId",
+      "localized_type": "строка меню",
+      "rect": [
+       1002,
+       305,
+       1030,
+       333
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Свернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1635,
+       297,
+       1695,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Развернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1695,
+       297,
+       1754,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     }
+    ]
+   },
+   "perparent": {
+    "mode": "perparent",
+    "runs": 2,
+    "elements": 29,
+    "ms_min": 105.7,
+    "ms_median": 116.9,
+    "ms_max": 128.1,
+    "ms_per_element": 4.03,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 5,
+      "ms": 44.44,
+      "ms_per_parent": 44.44
+     },
+     {
+      "level": 2,
+      "parents": 5,
+      "elements": 8,
+      "ms": 31.83,
+      "ms_per_parent": 6.37
+     },
+     {
+      "level": 3,
+      "parents": 8,
+      "elements": 16,
+      "ms": 25.67,
+      "ms_per_parent": 3.21
+     }
+    ],
+    "nodes_dumped": 29,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NotepadTextBox",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 7079504,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 13895348,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2496798,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2491552,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_TitleBarControlTypeId",
+      "localized_type": "название",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "Редактор текста",
+      "automation_id": "",
+      "class_name": "RichEditD2DPT",
+      "control_type": "UIA_DocumentControlTypeId",
+      "localized_type": "документ",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 5571914,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 5899196,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 10158608,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 1246340,
+      "level": 2
+     },
+     {
+      "name": "Система",
+      "automation_id": "MenuBar",
+      "class_name": "",
+      "control_type": "UIA_MenuBarControlTypeId",
+      "localized_type": "строка меню",
+      "rect": [
+       1002,
+       305,
+       1030,
+       333
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Свернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1635,
+       297,
+       1695,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Развернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1695,
+       297,
+       1754,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     }
+    ]
+   },
+   "propcost": {
+    "mode": "propcost",
+    "runs": 2,
+    "elements": 29,
+    "ms_min": 100.8,
+    "ms_median": 116.5,
+    "ms_max": 132.2,
+    "ms_per_element": 4.018,
+    "levels": [
+     {
+      "level": "cached_read",
+      "parents": 29,
+      "elements": 29,
+      "ms": 1.604,
+      "ms_per_parent": 0.0553,
+      "properties_per_element": 26
+     },
+     {
+      "level": "current_read",
+      "parents": 29,
+      "elements": 29,
+      "ms": 48.566,
+      "ms_per_parent": 1.6747,
+      "properties_per_element": 26
+     }
+    ],
+    "nodes_dumped": 58,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NotepadTextBox",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 7079504,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 13895348,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2496798,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 2491552,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_TitleBarControlTypeId",
+      "localized_type": "название",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Редактор текста",
+      "automation_id": "",
+      "class_name": "RichEditD2DPT",
+      "control_type": "UIA_DocumentControlTypeId",
+      "localized_type": "документ",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 5571914,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 5899196,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       348,
+       1813,
+       389
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 10158608,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       876,
+       1813,
+       916
+      ],
+      "offscreen": 0,
+      "enabled": 0,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 1246340,
+      "level": "cached_read"
+     },
+     {
+      "name": "Система",
+      "automation_id": "MenuBar",
+      "class_name": "",
+      "control_type": "UIA_MenuBarControlTypeId",
+      "localized_type": "строка меню",
+      "rect": [
+       1002,
+       305,
+       1030,
+       333
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Свернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1635,
+       297,
+       1695,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Развернуть",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1695,
+       297,
+       1754,
+       334
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     }
+    ]
+   },
+   "descendants": {
+    "mode": "descendants",
+    "runs": 2,
+    "elements": 53,
+    "ms_min": 131.8,
+    "ms_median": 142.6,
+    "ms_max": 153.5,
+    "ms_per_element": 2.691,
+    "levels": [
+     {
+      "level": "all",
+      "parents": 1,
+      "elements": 53,
+      "ms": 126.46,
+      "ms_per_parent": 126.46
+     }
+    ],
+    "nodes_dumped": 53,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "NotepadTextBox",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 7079504,
+      "level": 0
+     },
+     {
+      "name": "Редактор текста",
+      "automation_id": "",
+      "class_name": "RichEditD2DPT",
+      "control_type": "UIA_DocumentControlTypeId",
+      "localized_type": "документ",
+      "rect": [
+       1001,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 5571914,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "Microsoft.UI.Content.DesktopChildSiteBridge",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "Win32",
+      "hwnd": 13895348,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "InputSiteWindowClass",
+      "control_type": "UIA_PaneControlTypeId",
+      "localized_type": "панель",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 1,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": 5899196,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "Tabs",
+      "class_name": "Microsoft.UI.Xaml.Controls.TabView",
+      "control_type": "UIA_TabControlTypeId",
+      "localized_type": "вкладка",
+      "rect": [
+       1051,
+       308,
+       1590,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "TabListView",
+      "class_name": "ListView",
+      "control_type": "UIA_ListControlTypeId",
+      "localized_type": "список",
+      "rect": [
+       1053,
+       308,
+       1545,
+       348
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Human Writing.md. Не изменено.",
+      "automation_id": "",
+      "class_name": "ListViewItem",
+      "control_type": "UIA_TabItemControlTypeId",
+      "localized_type": "элемент вкладки",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Human Writing.md",
+      "automation_id": "",
+      "class_name": "TextBlock",
+      "control_type": "UIA_TextControlTypeId",
+      "localized_type": "текст",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "ARGON_PATCH_REPORT.md. Не изменено.",
+      "automation_id": "",
+      "class_name": "ListViewItem",
+      "control_type": "UIA_TabItemControlTypeId",
+      "localized_type": "элемент вкладки",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "ARGON_PATCH_REPORT.md",
+      "automation_id": "",
+      "class_name": "TextBlock",
+      "control_type": "UIA_TextControlTypeId",
+      "localized_type": "текст",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "build.gradle.kts. Не изменено.",
+      "automation_id": "",
+      "class_name": "ListViewItem",
+      "control_type": "UIA_TabItemControlTypeId",
+      "localized_type": "элемент вкладки",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "build.gradle.kts",
+      "automation_id": "",
+      "class_name": "TextBlock",
+      "control_type": "UIA_TextControlTypeId",
+      "localized_type": "текст",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 28040,
+      "framework": "XAML",
+      "hwnd": null,
+      "level": 0
+     }
+    ]
+   }
+  },
+  "opera.exe": {
+   "cached": {
+    "mode": "cached",
+    "runs": 2,
+    "elements": 10,
+    "ms_min": 45.9,
+    "ms_median": 46.7,
+    "ms_max": 47.6,
+    "ms_per_element": 4.673,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 1,
+      "ms": 43.46,
+      "ms_per_parent": 43.46
+     },
+     {
+      "level": 2,
+      "parents": 1,
+      "elements": 4,
+      "ms": 0.03,
+      "ms_per_parent": 0.03
+     },
+     {
+      "level": 3,
+      "parents": 4,
+      "elements": 5,
+      "ms": 0.03,
+      "ms_per_parent": 0.01
+     }
+    ],
+    "nodes_dumped": 10,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "ssr-nav-open enable-lm-loading-animation lr26 enable-lm-fast-follows chrome-context-v39 dark-theme enable-mweb-header-mavatar hide-ogb-signed-out-mweb lm-component-theme enable-lm-locale-line-height enable-lm-mobile-tokens enable-lm-non-latin-bold-weight enable-lm-spacing-tokens sidenav-mavatar-migration-enabled theme-host variable-context",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "chat-app",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "основная",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "cdk-live-announcer-0",
+      "class_name": "cdk-live-announcer-element cdk-visually-hidden",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       51,
+       134,
+       53,
+       136
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "_r_0_",
+      "class_name": "x1nqzqfw x1wv52q2",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       980,
+       93,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Новый чат",
+      "automation_id": "",
+      "class_name": "side-nav-sparkle-button",
+      "control_type": "UIA_HyperlinkControlTypeId",
+      "localized_type": "ссылка",
+      "rect": [
+       70,
+       151,
+       190,
+       191
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "Боковая панель",
+      "automation_id": "",
+      "class_name": "mystuff-side-nav-update hide-on-print ng-tns-c3898414624-3 ng-trigger ng-trigger-widthTransition disable-onload-animations ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       53,
+       136,
+       413,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       413,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "gem-button gem-button-badge-size-small gem-button-size-small gem-button-type-text-primary lm-enabled ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       1861,
+       153,
+       1906,
+       199
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "Notifications",
+      "automation_id": "",
+      "class_name": "x1a2a7pz x9f619 xeuugli xixxii4 x1ey2m1c xu96u03 xng3xce xc342km xh2tq4o x4iw5yo x193iq5w x78zum5 xdt5ytf x1cy8zhl x1czxa0d x47corl",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       53,
+       980,
+       93,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "perparent": {
+    "mode": "perparent",
+    "runs": 2,
+    "elements": 10,
+    "ms_min": 139.4,
+    "ms_median": 158.8,
+    "ms_max": 178.3,
+    "ms_per_element": 15.885,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 1,
+      "ms": 49.24,
+      "ms_per_parent": 49.24
+     },
+     {
+      "level": 2,
+      "parents": 1,
+      "elements": 4,
+      "ms": 42.39,
+      "ms_per_parent": 42.39
+     },
+     {
+      "level": 3,
+      "parents": 4,
+      "elements": 5,
+      "ms": 42.56,
+      "ms_per_parent": 10.64
+     }
+    ],
+    "nodes_dumped": 10,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "ssr-nav-open enable-lm-loading-animation lr26 enable-lm-fast-follows chrome-context-v39 dark-theme enable-mweb-header-mavatar hide-ogb-signed-out-mweb lm-component-theme enable-lm-locale-line-height enable-lm-mobile-tokens enable-lm-non-latin-bold-weight enable-lm-spacing-tokens sidenav-mavatar-migration-enabled theme-host variable-context",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "chat-app",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "основная",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "cdk-live-announcer-0",
+      "class_name": "cdk-live-announcer-element cdk-visually-hidden",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       51,
+       134,
+       53,
+       136
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "_r_0_",
+      "class_name": "x1nqzqfw x1wv52q2",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       980,
+       93,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Новый чат",
+      "automation_id": "",
+      "class_name": "side-nav-sparkle-button",
+      "control_type": "UIA_HyperlinkControlTypeId",
+      "localized_type": "ссылка",
+      "rect": [
+       70,
+       151,
+       190,
+       191
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "Боковая панель",
+      "automation_id": "",
+      "class_name": "mystuff-side-nav-update hide-on-print ng-tns-c3898414624-3 ng-trigger ng-trigger-widthTransition disable-onload-animations ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       53,
+       136,
+       413,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       413,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "gem-button gem-button-badge-size-small gem-button-size-small gem-button-type-text-primary lm-enabled ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       1861,
+       153,
+       1906,
+       199
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "Notifications",
+      "automation_id": "",
+      "class_name": "x1a2a7pz x9f619 xeuugli xixxii4 x1ey2m1c xu96u03 xng3xce xc342km xh2tq4o x4iw5yo x193iq5w x78zum5 xdt5ytf x1cy8zhl x1czxa0d x47corl",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       53,
+       980,
+       93,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "propcost": {
+    "mode": "propcost",
+    "runs": 2,
+    "elements": 10,
+    "ms_min": 71.0,
+    "ms_median": 71.8,
+    "ms_max": 72.7,
+    "ms_per_element": 7.183,
+    "levels": [
+     {
+      "level": "cached_read",
+      "parents": 10,
+      "elements": 10,
+      "ms": 0.659,
+      "ms_per_parent": 0.0659,
+      "properties_per_element": 26
+     },
+     {
+      "level": "current_read",
+      "parents": 10,
+      "elements": 10,
+      "ms": 18.481,
+      "ms_per_parent": 1.8481,
+      "properties_per_element": 26
+     }
+    ],
+    "nodes_dumped": 20,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "ssr-nav-open enable-lm-loading-animation lr26 enable-lm-fast-follows chrome-context-v39 dark-theme enable-mweb-header-mavatar hide-ogb-signed-out-mweb lm-component-theme enable-lm-locale-line-height enable-lm-mobile-tokens enable-lm-non-latin-bold-weight enable-lm-spacing-tokens sidenav-mavatar-migration-enabled theme-host variable-context",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "chat-app",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "основная",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "cdk-live-announcer-0",
+      "class_name": "cdk-live-announcer-element cdk-visually-hidden",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       51,
+       134,
+       53,
+       136
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "_r_0_",
+      "class_name": "x1nqzqfw x1wv52q2",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       980,
+       93,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Новый чат",
+      "automation_id": "",
+      "class_name": "side-nav-sparkle-button",
+      "control_type": "UIA_HyperlinkControlTypeId",
+      "localized_type": "ссылка",
+      "rect": [
+       70,
+       151,
+       190,
+       191
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Боковая панель",
+      "automation_id": "",
+      "class_name": "mystuff-side-nav-update hide-on-print ng-tns-c3898414624-3 ng-trigger ng-trigger-widthTransition disable-onload-animations ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       53,
+       136,
+       413,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       413,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "gem-button gem-button-badge-size-small gem-button-size-small gem-button-type-text-primary lm-enabled ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       1861,
+       153,
+       1906,
+       199
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Notifications",
+      "automation_id": "",
+      "class_name": "x1a2a7pz x9f619 xeuugli xixxii4 x1ey2m1c xu96u03 xng3xce xc342km xh2tq4o x4iw5yo x193iq5w x78zum5 xdt5ytf x1cy8zhl x1czxa0d x47corl",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "регион",
+      "rect": [
+       53,
+       980,
+       93,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "ssr-nav-open enable-lm-loading-animation lr26 enable-lm-fast-follows chrome-context-v39 dark-theme enable-mweb-header-mavatar hide-ogb-signed-out-mweb lm-component-theme enable-lm-locale-line-height enable-lm-mobile-tokens enable-lm-non-latin-bold-weight enable-lm-spacing-tokens sidenav-mavatar-migration-enabled theme-host variable-context",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "current_read"
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "chat-app",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "основная",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "current_read"
+     }
+    ]
+   },
+   "descendants": {
+    "mode": "descendants",
+    "runs": 2,
+    "elements": 383,
+    "ms_min": 590.8,
+    "ms_median": 598.1,
+    "ms_max": 605.4,
+    "ms_per_element": 1.562,
+    "levels": [
+     {
+      "level": "all",
+      "parents": 1,
+      "elements": 383,
+      "ms": 563.56,
+      "ms_per_parent": 563.56
+     }
+    ],
+    "nodes_dumped": 200,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "ssr-nav-open enable-lm-loading-animation lr26 enable-lm-fast-follows chrome-context-v39 dark-theme enable-mweb-header-mavatar hide-ogb-signed-out-mweb lm-component-theme enable-lm-locale-line-height enable-lm-mobile-tokens enable-lm-non-latin-bold-weight enable-lm-spacing-tokens sidenav-mavatar-migration-enabled theme-host variable-context",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "chat-app",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "основная",
+      "rect": [
+       53,
+       136,
+       1921,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Новый чат",
+      "automation_id": "",
+      "class_name": "side-nav-sparkle-button",
+      "control_type": "UIA_HyperlinkControlTypeId",
+      "localized_type": "ссылка",
+      "rect": [
+       70,
+       151,
+       190,
+       191
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Боковая панель",
+      "automation_id": "",
+      "class_name": "mystuff-side-nav-update hide-on-print ng-tns-c3898414624-3 ng-trigger ng-trigger-widthTransition disable-onload-animations ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       53,
+       136,
+       413,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "sidenav-with-history-container disable-onload-animations expanded side-nav-mystuff-update ng-star-inserted content-loaded",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       53,
+       136,
+       413,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "search-button search-island-host ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       313,
+       146,
+       358,
+       191
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Поиск по чатам",
+      "automation_id": "base-ui-_r_2_",
+      "class_name": "x1n2onr6 x16tdsg8 x1717udv x47umbl x5lhr3w x16ye13r xln7xf2 xjyslct xc8icb0 x1ghz6dp x9r1u3d x1ypdohk xarstr8 x1k48kgn x17e5bxp xtnhwn2 x1s928wv xmf22ne x2q1x1w x1j6awrg xxx281p x1x6ksa7 x6nxcb6 xxyica1 x1fo1fc9 xnrztfi xz664uh x1cpjm7i x124lp2h xkk1bqk x1hmns74 x1a2a7pz xeuugli xng3xce xc342km x3nfvp2 x6s0dn4 xl56j7k x2lah0s x1hl2dhg x1g9uew7 x9f619 x1uczgqu xj2j0vw x1g40iwv x1t137rt xxs81h3 x1k57tk5 xntm6nh xjbqb8w xdtj5xt",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       313,
+       146,
+       358,
+       191
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "mat-mdc-tooltip-trigger close-sidenav-button p42-enabled close-sidenav-button-desktop gem-button gem-button-badge-size-small gem-button-size-small gem-button-type-text-primary lm-enabled",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       358,
+       146,
+       403,
+       191
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Закрыть боковую панель",
+      "automation_id": "",
+      "class_name": "mdc-icon-button mat-mdc-icon-button mat-mdc-button-base mat-badge mat-unthemed mat-badge-overlap mat-badge-above mat-badge-after mat-badge-small mat-badge-hidden ng-star-inserted",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       358,
+       146,
+       403,
+       191
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Меню основных действий",
+      "automation_id": "",
+      "class_name": "mat-mdc-nav-list mat-mdc-list-base mdc-list gds-sidenav-list",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       63,
+       211,
+       403,
+       251
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Новый чат",
+      "automation_id": "",
+      "class_name": "mat-mdc-list-item mdc-list-item mat-mdc-tooltip-trigger gem-nav-list-item gmat-override mat-mdc-list-item-interactive mdc-list-item--with-leading-icon mdc-list-item--with-trailing-meta mat-mdc-list-item-both-leading-and-trailing mat-mdc-tooltip-disabled lm-enabled mat-mdc-list-item-single-line mdc-list-item--with-one-line ng-star-inserted",
+      "control_type": "UIA_HyperlinkControlTypeId",
+      "localized_type": "ссылка",
+      "rect": [
+       63,
+       211,
+       403,
+       251
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Меню дополнительных действий",
+      "automation_id": "",
+      "class_name": "mat-mdc-nav-list mat-mdc-list-base mdc-list gds-sidenav-list top-action-list-scrollable top-nav-expanded ng-star-inserted",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       63,
+       251,
+       403,
+       411
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 3484,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     }
+    ]
+   }
+  },
+  "Antigravity.exe": {
+   "cached": {
+    "mode": "cached",
+    "runs": 2,
+    "elements": 27,
+    "ms_min": 90.3,
+    "ms_median": 97.7,
+    "ms_max": 105.2,
+    "ms_per_element": 3.62,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 1,
+      "ms": 84.63,
+      "ms_per_parent": 84.63
+     },
+     {
+      "level": 2,
+      "parents": 1,
+      "elements": 6,
+      "ms": 0.04,
+      "ms_per_parent": 0.04
+     },
+     {
+      "level": 3,
+      "parents": 6,
+      "elements": 20,
+      "ms": 0.07,
+      "ms_per_parent": 0.01
+     }
+    ],
+    "nodes_dumped": 27,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "theme-standalone dark dark-theme theme-dark",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "root",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": ":r0:",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Typeahead menu",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ListControlTypeId",
+      "localized_type": "список",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Typeahead menu",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ListControlTypeId",
+      "localized_type": "список",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "a11y-live-announcer-polite",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "a11y-live-announcer-assertive",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Antigravity",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       10,
+       4,
+       123,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "File",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       127,
+       4,
+       180,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "View",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       184,
+       4,
+       249,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "Window",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       253,
+       4,
+       345,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "Sidebar",
+      "automation_id": "",
+      "class_name": "h-full w-full flex flex-col pb-2 bg-sidebar",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       0,
+       43,
+       320,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "perparent": {
+    "mode": "perparent",
+    "runs": 2,
+    "elements": 27,
+    "ms_min": 290.0,
+    "ms_median": 306.6,
+    "ms_max": 323.3,
+    "ms_per_element": 11.356,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 1,
+      "ms": 89.12,
+      "ms_per_parent": 89.12
+     },
+     {
+      "level": 2,
+      "parents": 1,
+      "elements": 6,
+      "ms": 83.76,
+      "ms_per_parent": 83.76
+     },
+     {
+      "level": 3,
+      "parents": 6,
+      "elements": 20,
+      "ms": 103.61,
+      "ms_per_parent": 17.27
+     }
+    ],
+    "nodes_dumped": 27,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "theme-standalone dark dark-theme theme-dark",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "",
+      "automation_id": "root",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": ":r0:",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Typeahead menu",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ListControlTypeId",
+      "localized_type": "список",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Typeahead menu",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ListControlTypeId",
+      "localized_type": "список",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "a11y-live-announcer-polite",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "",
+      "automation_id": "a11y-live-announcer-assertive",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Antigravity",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       10,
+       4,
+       123,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "File",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       127,
+       4,
+       180,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "View",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       184,
+       4,
+       249,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "Window",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       253,
+       4,
+       345,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     },
+     {
+      "name": "Sidebar",
+      "automation_id": "",
+      "class_name": "h-full w-full flex flex-col pb-2 bg-sidebar",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       0,
+       43,
+       320,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 3
+     }
+    ]
+   },
+   "propcost": {
+    "mode": "propcost",
+    "runs": 2,
+    "elements": 27,
+    "ms_min": 171.4,
+    "ms_median": 174.6,
+    "ms_max": 177.8,
+    "ms_per_element": 6.468,
+    "levels": [
+     {
+      "level": "cached_read",
+      "parents": 27,
+      "elements": 27,
+      "ms": 1.504,
+      "ms_per_parent": 0.0557,
+      "properties_per_element": 26
+     },
+     {
+      "level": "current_read",
+      "parents": 27,
+      "elements": 27,
+      "ms": 69.951,
+      "ms_per_parent": 2.5908,
+      "properties_per_element": 26
+     }
+    ],
+    "nodes_dumped": 54,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "theme-standalone dark dark-theme theme-dark",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "root",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": ":r0:",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Typeahead menu",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ListControlTypeId",
+      "localized_type": "список",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Typeahead menu",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ListControlTypeId",
+      "localized_type": "список",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "a11y-live-announcer-polite",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "",
+      "automation_id": "a11y-live-announcer-assertive",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "offscreen": 1,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Antigravity",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       10,
+       4,
+       123,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "File",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       127,
+       4,
+       180,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "View",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       184,
+       4,
+       249,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Window",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       253,
+       4,
+       345,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Sidebar",
+      "automation_id": "",
+      "class_name": "h-full w-full flex flex-col pb-2 bg-sidebar",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       0,
+       43,
+       320,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": "cached_read"
+     }
+    ]
+   },
+   "descendants": {
+    "mode": "descendants",
+    "runs": 2,
+    "elements": 764,
+    "ms_min": 1040.8,
+    "ms_median": 1051.7,
+    "ms_max": 1062.6,
+    "ms_per_element": 1.377,
+    "levels": [
+     {
+      "level": "all",
+      "parents": 1,
+      "elements": 764,
+      "ms": 1001.03,
+      "ms_per_parent": 1001.03
+     }
+    ],
+    "nodes_dumped": 200,
+    "sample_nodes": [
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "theme-standalone dark dark-theme theme-dark",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "root",
+      "class_name": "",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "группа",
+      "rect": [
+       0,
+       0,
+       1920,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Antigravity",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       10,
+       4,
+       123,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "File",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       127,
+       4,
+       180,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "View",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       184,
+       4,
+       249,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Window",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer justify-center disabled:opacity-50 bg-transparent text-muted-foreground hover:text-foreground hover:bg-secondary focus-visible:text-foreground focus-visible:bg-secondary h-7 text-sm rounded-md gap-1.5 px-2.5 select-none",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       253,
+       4,
+       345,
+       40
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Sidebar",
+      "automation_id": "",
+      "class_name": "h-full w-full flex flex-col pb-2 bg-sidebar",
+      "control_type": "UIA_GroupControlTypeId",
+      "localized_type": "навигация",
+      "rect": [
+       0,
+       43,
+       320,
+       1020
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "New Conversation",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer disabled:opacity-50 flex-grow w-full justify-start select-none font-normal h-8 min-w-0 gap-1.5 px-2 py-1 rounded-lg border border-border text-foreground bg-sidebar-muted hover:bg-sidebar-secondary",
+      "control_type": "UIA_HyperlinkControlTypeId",
+      "localized_type": "ссылка",
+      "rect": [
+       10,
+       108,
+       310,
+       149
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ImageControlTypeId",
+      "localized_type": "изображение",
+      "rect": [
+       21,
+       118,
+       41,
+       139
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Conversation History",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer disabled:opacity-50 flex-grow w-full justify-start select-none font-normal h-8 min-w-0 gap-1.5 px-2 py-1 rounded-lg bg-transparent text-secondary-foreground hover:bg-sidebar-muted hover:text-foreground",
+      "control_type": "UIA_HyperlinkControlTypeId",
+      "localized_type": "ссылка",
+      "rect": [
+       10,
+       156,
+       310,
+       197
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "",
+      "automation_id": "",
+      "class_name": "",
+      "control_type": "UIA_ImageControlTypeId",
+      "localized_type": "изображение",
+      "rect": [
+       20,
+       166,
+       40,
+       187
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     },
+     {
+      "name": "Automations",
+      "automation_id": "",
+      "class_name": "inline-flex items-center font-medium transition-colors select-none outline-none cursor-pointer disabled:opacity-50 flex-grow w-full justify-start select-none font-normal h-8 min-w-0 gap-1.5 px-2 py-1 rounded-lg bg-transparent text-secondary-foreground hover:bg-sidebar-muted hover:text-foreground",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       10,
+       203,
+       310,
+       244
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 1,
+      "focused": 0,
+      "password": 0,
+      "process_id": 29264,
+      "framework": "Chrome",
+      "hwnd": null,
+      "level": 0
+     }
+    ]
+   }
+  }
+ },
+ "hang": null
+}
