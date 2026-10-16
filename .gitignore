@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Модели и их кэши (не тащим в git)
+models/
+*.gguf
+*.safetensors
+.cache/
+huggingface/
+
+# Логи, дампы, записи сессий
+logs/
+*.log
+dumps/
+recordings/
+
+# Базы
+*.sqlite
+*.db
+
+# Окружение и секреты
+.env
+.env.local
+*.key
+secrets/
+
+# IDE
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+desktop.ini
