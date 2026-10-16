@@ -110,6 +110,7 @@ def main() -> int:
     global _log_path
     parser = argparse.ArgumentParser(description="Тестовое окно с тремя кнопками")
     parser.add_argument("--click-log", default=str(Path(__file__).resolve().parent / ".clicks.log"))
+    parser.add_argument("--title", default="MCP-Hands CoordinateSpace fixture")
     parser.add_argument("--x", type=int, default=140)
     parser.add_argument("--y", type=int, default=140)
     parser.add_argument("--width", type=int, default=900)
@@ -130,7 +131,7 @@ def main() -> int:
             raise OSError(f"RegisterClassW: {ctypes.get_last_error()}")
 
     hwnd = user32.CreateWindowExW(
-        0, class_name, "MCP-Hands CoordinateSpace fixture",
+        0, class_name, args.title,
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         args.x, args.y, args.width, args.height, None, None, instance, None)
     if not hwnd:

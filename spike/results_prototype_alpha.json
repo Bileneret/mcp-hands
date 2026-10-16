@@ -1,0 +1,79 @@
+{
+ "dpi": "PER_MONITOR_AWARE_V2",
+ "task": "alpha",
+ "window_filter": "prototype target",
+ "connection_timeout_ms": 500,
+ "saw": {
+  "frame_shape": [
+   1080,
+   1920,
+   4
+  ],
+  "ms": 10.95
+ },
+ "window": {
+  "hwnd": "0x941a78",
+  "pid": 11932,
+  "exe": "python.exe",
+  "title": "MCP-Hands prototype target",
+  "rect": {
+   "left": 175,
+   "top": 175,
+   "right": 1300,
+   "bottom": 875
+  }
+ },
+ "found": {
+  "ms": 27.39,
+  "found": true,
+  "node": {
+   "name": "alpha",
+   "automation_id": "101",
+   "class_name": "Button",
+   "control_type": "UIA_ButtonControlTypeId",
+   "localized_type": "кнопка",
+   "rect": [
+    210,
+    239,
+    460,
+    352
+   ],
+   "offscreen": 0,
+   "enabled": 1,
+   "focusable": 1,
+   "focused": 0,
+   "password": 0,
+   "process_id": 11932,
+   "framework": "Win32",
+   "hwnd": 7740002,
+   "level": 0
+  }
+ },
+ "clicked": {
+  "target_center": [
+   335,
+   295
+  ],
+  "normalized": [
+   11440,
+   17917
+  ],
+  "window_activated": true,
+  "click": {
+   "moved": true,
+   "landed": [
+    335,
+    295
+   ],
+   "cursor_expected": [
+    335,
+    295
+   ]
+  }
+ },
+ "verified": {
+  "ok": true,
+  "evidence": "CLICK alpha px=268,236"
+ },
+ "total_ms": 1193.5
+}

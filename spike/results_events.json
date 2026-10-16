@@ -1,0 +1,83 @@
+{
+ "window": {
+  "event_wait_ms": 121.7,
+  "event_wait_min_ms": 112.6,
+  "event_delivery_ms": 0.0,
+  "poll_interval_ms": 50,
+  "poll_wait_ms": 158.7,
+  "samples": [
+   {
+    "event_wait_ms": 114.0,
+    "event_delivery_ms": 0.0,
+    "event_deliveries": 1,
+    "poll_interval_ms": 50,
+    "poll_wait_ms": 171.7,
+    "note": "event_wait включает запуск процесса окна; event_delivery — чистая доставка хука"
+   },
+   {
+    "event_wait_ms": 127.9,
+    "event_delivery_ms": 0.0,
+    "event_deliveries": 1,
+    "poll_interval_ms": 50,
+    "poll_wait_ms": 158.0,
+    "note": "event_wait включает запуск процесса окна; event_delivery — чистая доставка хука"
+   },
+   {
+    "event_wait_ms": 121.7,
+    "event_delivery_ms": 0.0,
+    "event_deliveries": 1,
+    "poll_interval_ms": 50,
+    "poll_wait_ms": 158.7,
+    "note": "event_wait включает запуск процесса окна; event_delivery — чистая доставка хука"
+   },
+   {
+    "event_wait_ms": 112.6,
+    "event_delivery_ms": 16.0,
+    "event_deliveries": 1,
+    "poll_interval_ms": 50,
+    "poll_wait_ms": 162.2,
+    "note": "event_wait включает запуск процесса окна; event_delivery — чистая доставка хука"
+   },
+   {
+    "event_wait_ms": 121.8,
+    "event_delivery_ms": 15.0,
+    "event_deliveries": 1,
+    "poll_interval_ms": 50,
+    "poll_wait_ms": 157.8,
+    "note": "event_wait включает запуск процесса окна; event_delivery — чистая доставка хука"
+   }
+  ]
+ },
+ "file": {
+  "event_ms": 0.426,
+  "polling_ms": 14.397,
+  "poll_interval_ms": 50,
+  "samples": [
+   {
+    "event_ms": 0.338,
+    "polling_ms": 14.397,
+    "poll_interval_ms": 50
+   },
+   {
+    "event_ms": 0.426,
+    "polling_ms": 15.724,
+    "poll_interval_ms": 50
+   },
+   {
+    "event_ms": 0.468,
+    "polling_ms": 13.871,
+    "poll_interval_ms": 50
+   },
+   {
+    "event_ms": 0.491,
+    "polling_ms": 15.626,
+    "poll_interval_ms": 50
+   },
+   {
+    "event_ms": 0.366,
+    "polling_ms": 13.903,
+    "poll_interval_ms": 50
+   }
+  ]
+ }
+}

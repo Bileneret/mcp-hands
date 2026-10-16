@@ -1,0 +1,79 @@
+{
+ "dpi": "PER_MONITOR_AWARE_V2",
+ "task": "gamma",
+ "window_filter": "prototype target",
+ "connection_timeout_ms": 500,
+ "saw": {
+  "frame_shape": [
+   1080,
+   1920,
+   4
+  ],
+  "ms": 10.1
+ },
+ "window": {
+  "hwnd": "0x941a78",
+  "pid": 11932,
+  "exe": "python.exe",
+  "title": "MCP-Hands prototype target",
+  "rect": {
+   "left": 175,
+   "top": 175,
+   "right": 1300,
+   "bottom": 875
+  }
+ },
+ "found": {
+  "ms": 23.58,
+  "found": true,
+  "node": {
+   "name": "gamma",
+   "automation_id": "103",
+   "class_name": "Button",
+   "control_type": "UIA_ButtonControlTypeId",
+   "localized_type": "кнопка",
+   "rect": [
+    335,
+    639,
+    585,
+    752
+   ],
+   "offscreen": 0,
+   "enabled": 1,
+   "focusable": 1,
+   "focused": 0,
+   "password": 0,
+   "process_id": 11932,
+   "framework": "Win32",
+   "hwnd": 3479984,
+   "level": 0
+  }
+ },
+ "clicked": {
+  "target_center": [
+   460,
+   695
+  ],
+  "normalized": [
+   15709,
+   42212
+  ],
+  "window_activated": true,
+  "click": {
+   "moved": true,
+   "landed": [
+    460,
+    695
+   ],
+   "cursor_expected": [
+    460,
+    695
+   ]
+  }
+ },
+ "verified": {
+  "ok": true,
+  "evidence": "CLICK gamma px=368,557"
+ },
+ "total_ms": 918.9
+}
