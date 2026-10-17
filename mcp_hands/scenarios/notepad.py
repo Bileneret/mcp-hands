@@ -6,10 +6,13 @@
    открывающее файлы ВКЛАДКАМИ в одном процессе. Вкладка опознаётся по уникальному имени
    нашего файла, активируется выбором через UIA, и только после проверки заголовка
    выполняется ввод.
-2. **Никаких клавиш для закрытия вкладки.** Прежняя версия жала `Ctrl+W`; клавиши
-   действуют на АКТИВНОЕ окно, и при неудачной активации нажатие уходило в чужое
-   приложение (закрывало вкладки браузера и чужие программы). Теперь вкладка закрывается
-   паттернами UIA: выбор + программное нажатие кнопки закрытия.
+2. **Закрытие вкладки — строго по протоколу Ctrl+W (аудит v9).** Кнопки закрытия у
+   WinUI-вкладки в дереве UIA нет, InvokePattern тоже, поэтому одними паттернами
+   закрыть вкладку технически невозможно. Прежняя версия жала Ctrl+W без проверки —
+   при неудачной активации нажатие уходило в чужое приложение. Утверждённый протокол:
+   активация окна, подтверждение заголовка (имя нашего файла в заголовке = активна
+   именно наша вкладка), затем Ctrl+W через стража expect_hwnd, постусловие — вкладка
+   исчезла из дерева UIA, вкладки пользователя остались прежними.
 3. **Любой ввод — только после подтверждения активного окна.** `Actuator` получает
    `expect_hwnd` и отказывается работать, если активно не оно.
 4. **Перевод строки** отправляется клавишей Enter: юникод-символ `\\n` WinUI-Блокнот
@@ -20,6 +23,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import time
 import uuid
@@ -27,15 +31,28 @@ from pathlib import Path
 
 from ..events import EVENT_OBJECT_SHOW, EVENT_SYSTEM_FOREGROUND, EventPump
 from ..geometry import CoordinateSpace, enable_dpi_awareness
-from ..input import VK_CONTROL, VK_S, Actuator, same_text
-from ..uia import (UiaClient, element_text, enum_windows, find_child_element, invoke_element,
-                   select_element)
+from ..input import VK_CONTROL, VK_S, VK_W, Actuator, same_text
+from ..uia import UiaClient, element_text, enum_windows, find_child_element, select_element
 from .runner import Run
 
 TEXT = "MCP-Hands: сценарий Блокнота\nСтрока вторая с кириллицей\n"
 WAIT_WINDOW_S = 20
 TAB_PREFIX = "mcp-hands-"
 TAB_DEPTH = 10  # вкладки лежат глубже четырёх уровней: узкий обход их не видит
+# Имя вкладки в дереве UIA заканчивается статусом документа: «…txt. Не изменено.».
+# Статус отражает содержимое документа, а не вмешательство в чужие вкладки, поэтому
+# при сверке пользовательских вкладок он отбрасывается.
+STATUS_SUFFIX = re.compile(r"\. (?:Не изменено|Изменено)\.?$")
+DIRTY_TITLE = "*"  # при несохранённых изменениях Блокнот ставит «*» перед именем в заголовке
+
+
+def base_name(name: str) -> str:
+    """Имя вкладки без суффикса статуса: «RESULTS.md. Не изменено.» → «RESULTS.md»."""
+    return STATUS_SUFFIX.sub("", name)
+
+
+def window_title(hwnd: int) -> str:
+    return next((w["title"] for w in notepad_windows() if w["hwnd"] == hwnd), "")
 
 
 def make_marker() -> str:
@@ -67,13 +84,16 @@ def tab_names(uia: UiaClient, hwnd: int) -> list[str]:
 
 
 def tab_element(uia: UiaClient, hwnd: int, marker: str):
-    """Элемент вкладки с нашим именем — для UIA-паттернов."""
-    node = next((item for item in tab_nodes(uia, hwnd)
-                 if marker.lower() in (item.get("name") or "").lower()), None)
-    if node is None:
+    """Элемент вкладки с нашим именем; None, если вкладки нет или дерево недоступно."""
+    try:
+        node = next((item for item in tab_nodes(uia, hwnd)
+                     if marker.lower() in (item.get("name") or "").lower()), None)
+        if node is None:
+            return None
+        return find_child_element(uia.automation, uia.window(hwnd), name=node["name"]) or \
+            _find_tab_by_name(uia, hwnd, node["name"])
+    except Exception:  # noqa: BLE001 — окно закрылось во время поиска: нашей вкладки нет
         return None
-    return find_child_element(uia.automation, uia.window(hwnd), name=node["name"]) or \
-        _find_tab_by_name(uia, hwnd, node["name"])
 
 
 def _find_tab_by_name(uia: UiaClient, hwnd: int, name: str):
@@ -84,29 +104,84 @@ def _find_tab_by_name(uia: UiaClient, hwnd: int, name: str):
     return found if found else None
 
 
-def close_tab(uia: UiaClient, hwnd: int, marker: str) -> bool:
-    """Закрывает нашу вкладку через UIA: выбор + программное нажатие кнопки закрытия.
-
-    Ни одного нажатия клавиши: только паттерны. Так нажатие физически не может уйти
-    в другое приложение.
-    """
+def select_our_tab(uia: UiaClient, hwnd: int, marker: str) -> bool:
+    """Выбирает нашу вкладку паттерном SelectionItem; затем заголовок подтверждается."""
     element = tab_element(uia, hwnd, marker)
     if element is None:
-        return True
-    select_element(element)
-    time.sleep(0.4)
-    element = tab_element(uia, hwnd, marker)
-    if element is None:
-        return True
-    button = find_child_element(uia.automation, element, control_type="button")
-    if button is None or not invoke_element(button):
         return False
-    time.sleep(0.6)
-    return tab_element(uia, hwnd, marker) is None
+    try:
+        return bool(select_element(element))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def close_tab(uia: UiaClient, actuator: Actuator, hwnd: int, marker: str) -> dict:
+    """Закрывает нашу вкладку Ctrl+W строго по протоколу аудита v9.
+
+    Тройной контроль:
+    1. Активация окна и подтверждение заголовка: имя нашего файла обязано быть в
+       заголовке окна (= активна именно наша вкладка). Если активна чужая — наша
+       выбирается через UIA и заголовок подтверждается заново.
+    2. Ctrl+W уходит только через стража (expect_hwnd): при смещении фокуса — отказ
+       и ноль событий.
+    3. Постусловие: вкладки больше нет в дереве UIA (два замера подряд — защита от
+       случайного разрыва обхода).
+    """
+    steps = {"selected_via_uia": False, "title_ok": False, "hotkey_ok": False, "gone": False}
+    if not actuator.activate(hwnd).get("ok"):
+        steps["reason"] = "окно не удалось активировать — нажатие не отправлялось"
+        return steps
+    if find_our_window(marker, timeout_s=1).get("hwnd") != hwnd:
+        if not select_our_tab(uia, hwnd, marker):
+            steps["reason"] = "наша вкладка не найдена в дереве — нажатие не отправлялось"
+            return steps
+        steps["selected_via_uia"] = True
+        time.sleep(0.5)
+        steps["title_after_select"] = window_title(hwnd)
+    if find_our_window(marker, timeout_s=3).get("hwnd") != hwnd:
+        steps["reason"] = "заголовок окна не подтверждён — нажатие не отправлялось"
+        return steps
+    steps["title_ok"] = True
+    # Dirty-вкладка (звёздочка в заголовке) вместо закрытия показала бы диалог
+    # «Сохранить изменения?» — вкладка осталась бы, а диалог повис в чужом окне.
+    # Файл с нашим префиксом — наш артефакт прогона, сохранение в него безопасно.
+    if window_title(hwnd).startswith(DIRTY_TITLE):
+        save = actuator.hotkey(VK_CONTROL, VK_S, expect_hwnd=hwnd)
+        steps["save"] = save
+        if not save.get("ok"):
+            steps["reason"] = save.get("reason", "Ctrl+S отменён стражем — вкладка не закрывается")
+            return steps
+        deadline = time.time() + 5
+        while time.time() < deadline and window_title(hwnd).startswith(DIRTY_TITLE):
+            time.sleep(0.3)
+        if window_title(hwnd).startswith(DIRTY_TITLE):
+            steps["reason"] = "после Ctrl+S документ остался с несохранёнными изменениями"
+            return steps
+    hotkey = actuator.hotkey(VK_CONTROL, VK_W, expect_hwnd=hwnd)
+    steps["hotkey"] = hotkey
+    if not hotkey.get("ok"):
+        steps["reason"] = hotkey.get("reason", "нажатие отменено стражем")
+        return steps
+    steps["hotkey_ok"] = True
+    misses = 0
+    deadline = time.time() + 5
+    while time.time() < deadline and misses < 2:
+        time.sleep(0.3)
+        misses = misses + 1 if tab_element(uia, hwnd, marker) is None else 0
+    steps["gone"] = misses >= 2
+    if not steps["gone"]:
+        steps["reason"] = "вкладка осталась в дереве после Ctrl+W"
+    return steps
 
 
 def all_tabs(uia: UiaClient) -> list[str]:
-    return [name for window in notepad_windows() for name in tab_names(uia, window["hwnd"])]
+    tabs: list[str] = []
+    for window in notepad_windows():
+        try:
+            tabs.extend(tab_names(uia, window["hwnd"]))
+        except Exception:  # noqa: BLE001 — окно исчезло между снапшотом и обходом
+            continue
+    return tabs
 
 
 def scenario(run: Run, workdir: Path) -> None:
@@ -115,27 +190,45 @@ def scenario(run: Run, workdir: Path) -> None:
     uia = UiaClient()
 
     with run.step("убрать вкладки прошлых прогонов", expect="вкладок с нашим префиксом нет",
-                  method="UIA: выбор вкладки и нажатие её кнопки закрытия, без клавиш") as step:
+                  method="Ctrl+W по протоколу аудита v9: подтверждение заголовка, страж") as step:
         removed: list[str] = []
+        refused: list[str] = []
         for window in notepad_windows():
-            for name in tab_names(uia, window["hwnd"]):
-                marker = name.split()[0].rstrip("*") if name.split() else ""
-                if marker.startswith(TAB_PREFIX) and close_tab(uia, window["hwnd"], marker):
+            try:
+                names = tab_names(uia, window["hwnd"])
+            except Exception:  # noqa: BLE001 — окно исчезло между снапшотом и обходом
+                continue
+            for name in names:
+                # Имя вкладки UIA со статусом: «mcp-hands-…txt. Не изменено.»; маркер
+                # обязан быть без суффикса статуса и без точки на конце — иначе он
+                # никогда не совпадёт с заголовком окна («…txt — Блокнот», без точки).
+                marker = base_name(name).split()[0].rstrip("*.") if name.split() else ""
+                if not marker.startswith(TAB_PREFIX):
+                    continue
+                result = close_tab(uia, actuator, window["hwnd"], marker)
+                if result.get("gone"):
                     removed.append(name)
+                else:
+                    refused.append(f"{name}: {result.get('reason', 'закрытие не подтвердилось')} "
+                                   f"[sel={result.get('selected_via_uia')}, "
+                                   f"title_after={result.get('title_after_select')}]")
         left = [name for name in all_tabs(uia) if name.startswith(TAB_PREFIX)]
-        step.details.update({"removed": removed, "left": left})
+        step.details.update({"removed": removed, "left": left, "refused": refused})
         run.confirm(f"убрано {len(removed)}, осталось наших {len(left)}", ok=not left)
+        if left:
+            step.error = f"не убраны наши вкладки: {left}; отказы: {refused}"
 
     marker = make_marker()
     target = workdir / f"{marker}.txt"
     target.write_text("", encoding="utf-8")
-    user_tabs_before = [name for name in all_tabs(uia) if not name.startswith(TAB_PREFIX)]
-    run.note(user_tabs_before=user_tabs_before)
+    user_tabs_before = sorted(base_name(name) for name in all_tabs(uia)
+                              if not name.startswith(TAB_PREFIX))
 
     process = None
     hwnd = 0
     with run.step("открыть наш файл в Блокноте", expect="наша вкладка активна",
                   method="запуск процесса + ожидание появления вкладки") as step:
+        run.note(user_tabs_before=user_tabs_before)
         with EventPump(events=(EVENT_SYSTEM_FOREGROUND, EVENT_OBJECT_SHOW)) as pump:
             process = subprocess.Popen(["notepad.exe", str(target)])
             event = pump.wait(lambda e: marker.lower() in e.title.lower(), timeout_s=3)
@@ -150,11 +243,9 @@ def scenario(run: Run, workdir: Path) -> None:
         hwnd = window["hwnd"]
 
     with run.step("активировать нашу вкладку", expect="активна именно наша вкладка",
-                  method="UIA: выбор вкладки + активация окна") as step:
+                  method="активация окна + проверка заголовка") as step:
         activation = actuator.activate(hwnd)
-        element = tab_element(uia, hwnd, marker)
-        selected = select_element(element) if element is not None else False
-        step.details.update({"activation": activation, "selected_via_uia": selected})
+        step.details["activation"] = activation
         time.sleep(0.4)
         focused = find_our_window(marker, timeout_s=3)
         step.details["focused"] = focused
@@ -199,6 +290,7 @@ def scenario(run: Run, workdir: Path) -> None:
         if not ok:
             step.error = typing.get("reason", "текст не совпал")
 
+    saved_clean = False
     with run.step("сохранить (Ctrl+S)", expect="файл на диске содержит введённый текст",
                   method="хоткей в проверенно активное окно + чтение файла") as step:
         saved_keys = actuator.hotkey(VK_CONTROL, VK_S, expect_hwnd=hwnd)
@@ -215,19 +307,26 @@ def scenario(run: Run, workdir: Path) -> None:
         step.details["file"] = {"path": str(target), "bytes": target.stat().st_size,
                                 "content": saved[:160]}
         ok = same_text(saved, TEXT)
+        saved_clean = ok
         run.confirm(f"{target.stat().st_size} байт, текст совпал: {ok}", ok=ok)
         if not ok:
             step.error = f"в файле нет введённого текста: {saved[:80]!r}"
 
     with run.step("закрыть нашу вкладку", expect="наша вкладка закрыта, вкладки пользователя целы",
-                  method="UIA: выбор вкладки и нажатие кнопки закрытия, без клавиш") as step:
-        closed = close_tab(uia, hwnd, marker)
+                  method="Ctrl+W по протоколу аудита v9: заголовок, страж expect_hwnd, "
+                         "постусловие UIA") as step:
+        if not saved_clean:
+            step.error = "вкладка может содержать несохранённые изменения — Ctrl+W не отправляется"
+            return
+        result = close_tab(uia, actuator, hwnd, marker)
         names = all_tabs(uia)
-        user_after = [name for name in names if not name.startswith(TAB_PREFIX)]
-        step.details.update({"tabs_after": names, "user_tabs_after": user_after})
-        run.confirm(f"вкладок осталось {len(names)}; пользовательские целы: "
-                    f"{user_after == user_tabs_before}",
-                    ok=closed and user_after == user_tabs_before)
+        user_after = sorted(base_name(name) for name in names if not name.startswith(TAB_PREFIX))
+        users_ok = user_after == user_tabs_before
+        step.details.update({"close": result, "tabs_after": names, "user_tabs_after": user_after})
+        run.confirm(f"вкладка закрыта: {result['gone']}; осталось вкладок {len(names)}; "
+                    f"пользовательские целы: {users_ok}", ok=result["gone"] and users_ok)
+        if not result["gone"] or not users_ok:
+            step.error = result.get("reason", "постусловие закрытия не выполнено")
         if process is not None:
             try:
                 process.wait(timeout=2)  # процесс НЕ убиваем: в нём могут быть чужие вкладки

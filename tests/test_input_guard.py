@@ -62,7 +62,7 @@ def test_keyboard_with_wrong_target_is_refused(target):
     assert spy.events == 0
 
 
-def test_keyboard_with_correct_target_is_allowed(target):
+def test_keyboard_with_correct_target_is_allowed(target, require_input_desktop):
     """Наше окно активно — ввод выполняется (события формируются)."""
     actuator = Actuator(CoordinateSpace())
     activation = actuator.activate(target.hwnd)
@@ -84,7 +84,7 @@ def test_explicit_opt_out_still_works():
     assert result["ok"] and spy.events == 4
 
 
-def test_guard_reports_what_was_foreground(target):
+def test_guard_reports_what_was_foreground(target, require_input_desktop):
     """В отказе видно, какое окно было активным: это нужно для разбора инцидентов."""
     actuator = Actuator(CoordinateSpace())
     actuator.activate(target.hwnd)
