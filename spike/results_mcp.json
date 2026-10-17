@@ -1,0 +1,40 @@
+{
+ "sdk": "mcp 2.3.0",
+ "python": "3.12.0",
+ "spawn_s": 0.012,
+ "init_s": 1.254,
+ "server_name": "mcp-hands-spike",
+ "tools": [
+  "ping",
+  "echo_cyrillic",
+  "echo_model"
+ ],
+ "call_cold_ms": 3.0,
+ "ping_result": [
+  {
+   "type": "text",
+   "text": "{\n  \"ok\": true,\n  \"reply\": \"pong\"\n}"
+  }
+ ],
+ "ping_structured": null,
+ "call_warm_ms": {
+  "min": 1.5,
+  "median": 1.9,
+  "max": 2.8
+ },
+ "cyrillic": {
+  "returned": "Шаг за шагом: Мираж на кириллице «MCP-Hands» — 42%",
+  "roundtrip_ok": true,
+  "isError": false,
+  "structured": null
+ },
+ "typed": {
+  "structured": {
+   "ok": true,
+   "echo": "Шаг за шагом: Мираж на кириллице «MCP-Hands» — 42%",
+   "guard_refused": false
+  },
+  "isError": false
+ },
+ "total_s": 0.238
+}
