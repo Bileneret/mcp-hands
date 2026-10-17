@@ -249,7 +249,7 @@ def test_kill_tracked_reports_missing_process():
 # --- P2: живая проверка ввода (аудит: моки маскируют отказы среды) ---------------------
 
 
-def test_native_input_reaches_window(target):
+def test_native_input_reaches_window(target, require_input_desktop):
     """Живая проверка: настоящий SendInput доходит до кнопки мишени.
 
     Моки проверяют формирование структур, но не доставку. Здесь ввод отправляется

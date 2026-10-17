@@ -35,6 +35,7 @@ class Target:
                                         creationflags=CREATE_NO_WINDOW)
         self.hwnd = 0
         self.pid = 0
+        self.desktop = ""
         self.ready = False
         deadline = time.time() + 15
         while time.time() < deadline:
@@ -45,7 +46,11 @@ class Target:
                 self.hwnd = int(line.strip().split("=", 1)[1], 16)
             elif line.startswith("PID="):
                 self.pid = int(line.strip().split("=", 1)[1])
-            if self.hwnd and self.pid:
+            elif line.startswith("DESKTOP="):
+                self.desktop = line.strip().split("=", 1)[1]
+            # Ждём и строку с рабочим столом: мишень печатает её после PID,
+            # и без неё проверка «окно на столе ввода» осталась бы без данных.
+            if self.hwnd and self.pid and self.desktop:
                 self.ready = True
                 break
         time.sleep(0.6)  # окну нужно дорисоваться и попасть в дерево UIA
@@ -99,6 +104,28 @@ def capture_available() -> bool:
 def require_capture(capture_available: bool) -> None:
     if not capture_available:
         pytest.skip("захват экрана недоступен в этой сессии: DXGI и BitBlt отказали")
+
+
+def input_desktop_name() -> str:
+    """Имя рабочего стола, на который уходит ввод в этом процессе."""
+    from mcp_hands.geometry import CoordinateSpace
+    from mcp_hands.input import Actuator
+
+    return Actuator(CoordinateSpace()).own_desktop()
+
+
+@pytest.fixture
+def require_input_desktop(target):
+    """Пропускает тест ввода, если окно мишени на другом рабочем столе.
+
+    В песочнице или служебном сеансе окно мишени может оказаться на параллельном столе:
+    тогда клики физически не доходят, и это отказ среды, а не поломка кода. Мишень
+    старается создаться на столе ввода сама; если не удалось — тест честно пропускается
+    с указанием обоих имён.
+    """
+    ours = input_desktop_name()
+    if target.desktop and ours and target.desktop != ours:
+        pytest.skip(f"мишень на рабочем столе {target.desktop!r}, ввод идёт на {ours!r}")
 
 
 @pytest.fixture

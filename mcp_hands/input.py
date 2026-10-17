@@ -230,6 +230,22 @@ class Actuator:
                                   f"(170 — у потока уже есть окна или хуки)"}
         return self.desktop
 
+    def own_desktop(self) -> str:
+        """Имя рабочего стола текущего потока."""
+        desktop = self.user32.GetThreadDesktop(self.kernel32.GetCurrentThreadId())
+        return self._desktop_name(desktop) if desktop else ""
+
+    def window_desktop(self, hwnd: int) -> str:
+        """Имя рабочего стола, на котором создано окно.
+
+        Ввод уходит на рабочий стол вызывающего потока. Окно параллельного рабочего стола
+        (служба, песочница, заблокированный сеанс) физически не получит ни мышь, ни
+        клавиатуру — и это надо называть вслух, а не кликать в пустоту.
+        """
+        thread_id = self.user32.GetWindowThreadProcessId(wintypes.HWND(hwnd), None)
+        desktop = self.user32.GetThreadDesktop(thread_id) if thread_id else 0
+        return self._desktop_name(desktop) if desktop else ""
+
     @staticmethod
     def _desktop_name(handle) -> str:
         buffer = ctypes.create_unicode_buffer(256)
@@ -379,6 +395,14 @@ class Actuator:
                 return {**result, "ok": False,
                         "reason": "целевое окно запущено с более высокими правами: ввод не дойдёт"}
         target_hwnd = window_hwnd or node.get("hwnd") or 0
+        if target_hwnd:
+            ours, theirs = self.own_desktop(), self.window_desktop(target_hwnd)
+            result["desktop"] = {"ours": ours, "target": theirs}
+            if ours and theirs and not ours.startswith("<") and not theirs.startswith("<") \
+                    and ours != theirs:
+                return {**result, "ok": False,
+                        "reason": f"окно цели на рабочем столе {theirs!r}, ввод идёт "
+                                  f"на {ours!r}: клик туда не дойдёт"}
         if activate and target_hwnd:
             result["activation"] = self.activate(target_hwnd)
         result.update(self.click(*center))

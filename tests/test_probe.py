@@ -54,7 +54,7 @@ def test_walk_returns_levels(probe, target):
     assert result["nodes"], "узлы не собраны"
 
 
-def test_click_reaches_element(probe, target):
+def test_click_reaches_element(probe, target, require_input_desktop):
     """Клик через сателлит доходит до кнопки: мишень сама подтверждает попадание."""
     result = probe.click(target.hwnd, name="beta", control_type="button")
     assert result.get("ok"), f"клик не выполнен: {result}"

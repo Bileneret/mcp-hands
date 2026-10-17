@@ -105,10 +105,38 @@ def wnd_proc(hwnd, message, wparam, lparam):
     return user32.DefWindowProcW(hwnd, message, wparam, lparam)
 
 
+def attach_to_input_desktop() -> dict:
+    """Создаёт окно там, куда придёт ввод.
+
+    Если процесс запущен в песочнице или служебном сеансе, его окно оказывается на
+    параллельном рабочем столе: щелчки, отправленные на рабочий стол ввода, до него
+    не доходят, и тесты ввода ложно падают. Вызывать до создания окна.
+    """
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    user32.OpenInputDesktop.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    user32.OpenInputDesktop.restype = wintypes.HANDLE
+    user32.SetThreadDesktop.argtypes = [wintypes.HANDLE]
+    user32.SetThreadDesktop.restype = wintypes.BOOL
+    user32.GetUserObjectInformationW.argtypes = [wintypes.HANDLE, ctypes.c_int,
+                                                 ctypes.c_void_p, wintypes.DWORD,
+                                                 ctypes.POINTER(wintypes.DWORD)]
+    desktop = user32.OpenInputDesktop(0, False, 0x01FF)
+    if not desktop:
+        return {"attached": False, "reason": f"OpenInputDesktop: {ctypes.get_last_error()}"}
+    attached = bool(user32.SetThreadDesktop(desktop))
+    buffer = ctypes.create_unicode_buffer(256)
+    needed = wintypes.DWORD(0)
+    user32.GetUserObjectInformationW(desktop, 2, buffer, ctypes.sizeof(buffer),
+                                     ctypes.byref(needed))  # UOI_NAME
+    return {"attached": attached, "name": buffer.value,
+            "reason": None if attached else f"SetThreadDesktop: {ctypes.get_last_error()}"}
+
+
 def main() -> int:
     global _log_path
     with __import__("contextlib").suppress(OSError):
         ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    desktop = attach_to_input_desktop()
 
     parser = argparse.ArgumentParser(description="Тестовое окно с тремя кнопками")
     parser.add_argument("--click-log", default=str(Path(__file__).resolve().parent / ".clicks.log"))
@@ -141,6 +169,7 @@ def main() -> int:
 
     print(f"HWND={hwnd:#x}", flush=True)
     print(f"PID={os.getpid()}", flush=True)
+    print(f"DESKTOP={desktop['name']}", flush=True)
     print(f"BUTTONS={','.join(name for name, *_ in BUTTONS)}", flush=True)
 
     message = wintypes.MSG()
