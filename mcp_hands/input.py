@@ -64,6 +64,7 @@ VK_C = 0x43
 VK_F = 0x46
 VK_S = 0x53
 VK_V = 0x56
+VK_W = 0x57
 VK_X = 0x58
 VK_Z = 0x5A
 
@@ -102,6 +103,20 @@ class SID_AND_ATTRIBUTES(ctypes.Structure):
 
 class TOKEN_MANDATORY_LABEL(ctypes.Structure):
     _fields_ = [("Label", SID_AND_ATTRIBUTES)]
+
+
+def same_text(observed: str, expected: str) -> bool:
+    """Сравнивает текст независимо от переводов строк и хвостовых пробелов.
+
+    Приложения отдают разные переводы строк: Блокнот возвращает CR, наши строки
+    содержат LF, файлы на диске — CRLF. Без нормализации успешный ввод объявлялся
+    неудачей: сценарий трижды перепечатывал текст и падал (найдено на стенде).
+    """
+    def normalize(value: str) -> str:
+        return (value.replace("\r\n", "\n")
+                .replace("\r", "\n").strip())
+
+    return normalize(expected) in normalize(observed) if expected.strip() else True
 
 
 def integrity_level_of_process(pid: int) -> dict:
@@ -410,25 +425,63 @@ class Actuator:
 
     # --- клавиатура -------------------------------------------------------
 
-    def type_text(self, text: str, char_delay_s: float = 0.0) -> dict:
+    def type_text(self, text: str, char_delay_s: float = 0.012) -> dict:
         """Ввод текста через SendInput в режиме Unicode: кириллица и символы вне BMP.
 
         Строка переводится в 16-битные code units UTF-16: символы вне основной плоскости
         (эмодзи и прочие) отправляются суррогатной парой, как требует Windows. Прямая
         передача `ord(char)` в 16-битное поле не падает, а **молча обрезает** код
         (`0x1F680` превращалось в `0xF680`), вводя неверный символ.
+
+        Пауза между символами по умолчанию ненулевая: современные приложения (WinUI-Блокнот)
+        теряют часть символов при плотном потоке событий — замерено, что из 30 знаков
+        доходило около половины. 12 мс на символ незаметны для задачи и убирают потери.
         """
         units: list[int] = []
         for char in text:
             encoded = char.encode("utf-16-le")
             units.extend(int.from_bytes(encoded[index:index + 2], "little")
                          for index in range(0, len(encoded), 2))
+        returns = 0
         for unit in units:
-            self._send((INPUT_KEYBOARD, KEYEVENTF_UNICODE, 0, 0, unit),
-                       (INPUT_KEYBOARD, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0, unit))
+            if unit == 0x0A:  # перевод строки
+                # Юникод-символ перевода строки современные поля игнорируют: WinUI-Блокнот
+                # склеивал строки. Нажимаем настоящую клавишу Enter.
+                self._send((INPUT_KEYBOARD, 0, 0, 0, VK_RETURN),
+                           (INPUT_KEYBOARD, KEYEVENTF_KEYUP, 0, 0, VK_RETURN))
+                returns += 1
+            else:
+                self._send((INPUT_KEYBOARD, KEYEVENTF_UNICODE, 0, 0, unit),
+                           (INPUT_KEYBOARD, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0, unit))
             if char_delay_s:
                 time.sleep(char_delay_s)
-        return {"ok": True, "chars": len(text), "code_units": len(units)}
+        return {"ok": True, "chars": len(text), "code_units": len(units), "returns": returns}
+
+    def type_text_verified(self, text: str, read_back, attempts: int = 3,
+                           char_delay_s: float = 0.012, settle_s: float = 0.4) -> dict:
+        """Вводит текст и ПРОВЕРЯЕТ, что он дошёл; при потере — очищает и повторяет.
+
+        Постусловие важнее вызова: приложение может потерять часть символов (WinUI-Блокнот
+        терял половину при плотном потоке), и без проверки агент считал бы шаг успешным.
+        `read_back` — функция без аргументов, возвращающая текущий текст поля.
+        """
+        last = ""
+        for attempt in range(1, max(1, attempts) + 1):
+            self.type_text(text, char_delay_s=char_delay_s)
+            time.sleep(settle_s)
+            last = read_back() or ""
+            if same_text(last, text):
+                return {"ok": True, "attempts": attempt, "chars": len(text),
+                        "observed": last[:120]}
+            # Очищаем поле и пробуем снова: Ctrl+A, затем Delete.
+            self.hotkey(VK_CONTROL, VK_A)
+            time.sleep(0.1)
+            self._send((INPUT_KEYBOARD, 0, 0, 0, VK_DELETE),
+                       (INPUT_KEYBOARD, KEYEVENTF_KEYUP, 0, 0, VK_DELETE))
+            time.sleep(0.2)
+        return {"ok": False, "attempts": attempts, "chars": len(text),
+                "observed": last[:120],
+                "reason": "текст не дошёл до поля целиком"}
 
     def hotkey(self, *virtual_keys: int) -> dict:
         for key in virtual_keys:

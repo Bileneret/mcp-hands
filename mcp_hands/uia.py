@@ -366,6 +366,25 @@ class UiaClient:
                 "ms": round((time.perf_counter() - started) * 1000.0, 2)}
 
 
+def element_text(element, max_length: int = -1) -> str:
+    """Текст элемента через TextPattern.
+
+    Нужен там, где дети не отдаются вовсе: WinUI-Блокнот представляет документ одним
+    элементом без потомков, и содержимое доступно только через текстовый паттерн.
+    """
+    try:
+        pattern = element.GetCurrentPattern(UIA.UIA_TextPatternId)
+    except Exception:  # noqa: BLE001 — паттерн есть не у всех элементов
+        return ""
+    if not pattern:
+        return ""
+    try:
+        text_pattern = pattern.QueryInterface(UIA.IUIAutomationTextPattern)
+        return text_pattern.DocumentRange.GetText(max_length)
+    except Exception:  # noqa: BLE001
+        return ""
+
+
 def cached_children(element) -> list:
     """Дети из кэша: без межпроцессного вызова, но NULL у листьев."""
     try:
