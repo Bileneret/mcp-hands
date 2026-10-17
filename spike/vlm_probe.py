@@ -137,8 +137,14 @@ def load_model(name: str, quantization: str, device_map: str = "auto",
     kwargs["device_map"] = {"": 0} if device_map == "gpu" else device_map
 
     started = time.perf_counter()
-    processor_kwargs = {"max_pixels": max_pixels} if max_pixels else {}
-    processor = AutoProcessor.from_pretrained(name, **processor_kwargs)
+    processor = AutoProcessor.from_pretrained(name)
+    if max_pixels:
+        # В transformers 5.x min_pixels/max_pixels в from_pretrained больше не действуют:
+        # размер задаётся полем size у обработчика изображений. Без этого Qwen-обработчик
+        # УВЕЛИЧИВАЕТ кроп окна (1125x700 -> 1400x840, ~1500 визуальных токенов),
+        # и время ответа определяется префиллом картинки, а не моделью.
+        processor.image_processor.size = {"longest_edge": int(max_pixels),
+                                          "shortest_edge": 28 * 28 * 4}
     try:
         model = AutoModelForImageTextToText.from_pretrained(name, **kwargs)
     except TypeError:
@@ -171,10 +177,52 @@ def ask(model, processor, image, prompt: str, max_new_tokens: int) -> dict:
     new_tokens = output.shape[1] - inputs["input_ids"].shape[1]
     text = processor.batch_decode(output[:, inputs["input_ids"].shape[1]:],
                                   skip_special_tokens=True)[0]
+    grid = None
+    if "image_grid_thw" in inputs:
+        value = inputs["image_grid_thw"][0].tolist()
+        patch = int(getattr(processor.image_processor, "patch_size", 16) or 16)
+        # Сетка в патчах: размер картинки, которую реально видит модель. Шаг патча берём
+        # у обработчика, а не из головы: у Qwen3-VL это 16, и подстановка 28 (шаг Qwen2-VL)
+        # сдвигает пересчёт координат в 1.75 раза — на этом уже была получена ложная цифра.
+        grid = {"patches": [int(v) for v in value],
+                "patch_size": patch,
+                "size": [int(value[2]) * patch, int(value[1]) * patch],
+                "llm_tokens": (int(value[1]) // 2) * (int(value[2]) // 2)}
     return {"text": text.strip(), "ms": round(elapsed_ms, 1),
             "prompt_tokens": int(inputs["input_ids"].shape[1]),
             "tokens": int(new_tokens),
+            "image_grid": grid,
             "tokens_per_second": round(new_tokens / max(1e-3, elapsed_ms / 1000), 1)}
+
+
+def scalar(value) -> float:
+    """Модель иногда отдаёт координату списком (например [111, 111]) — берём первое число."""
+    if isinstance(value, (list, tuple)):
+        for item in value:
+            if isinstance(item, (int, float)):
+                return float(item)
+        return 0.0
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def screen_point(parsed: dict, grid: dict | None, crop_size: tuple, window_rect: dict) -> tuple[float, float]:
+    """Точка ответа модели -> координаты экрана.
+
+    Модель отвечает в своей сетке: процессор ужимает кроп под лимит визуальных токенов,
+    поэтому координаты сначала масштабируются к пикселям кропа, и только потом
+    сдвигаются на левый верхний угол окна. Без этих двух шагов сверка с UIA бессмысленна:
+    так была получена первая (неверная) оценка 260-292 px.
+    """
+    x = scalar(parsed.get("x")) + scalar(parsed.get("width")) / 2
+    y = scalar(parsed.get("y")) + scalar(parsed.get("height")) / 2
+    if grid and grid.get("size"):
+        width, height = grid["size"]
+        x *= crop_size[0] / max(1, width)
+        y *= crop_size[1] / max(1, height)
+    return x + window_rect["left"], y + window_rect["top"]
 
 
 def parse_coordinates(text: str) -> dict | None:
@@ -245,9 +293,10 @@ def main() -> int:
         outcome = ask(model, processor, image, GROUNDING_PROMPT.format(name=name), args.max_new_tokens)
         parsed = parse_coordinates(outcome["text"])
         entry = {"name": name, "ms": outcome["ms"], "raw": outcome["text"][:200], "parsed": parsed,
-                 "hit": None, "distance_px": None}
+                 "image_grid": outcome.get("image_grid"), "hit": None, "distance_px": None}
         if parsed and parsed.get("found") and "x" in parsed and "y" in parsed:
-            point = (float(parsed["x"]), float(parsed["y"]))
+            point = screen_point(parsed, outcome.get("image_grid"), image.size, rect)
+            entry["point_on_screen"] = [round(value, 1) for value in point]
             if name in truth:
                 box = truth[name]
                 entry["hit"] = (box["left"] <= point[0] <= box["right"]
@@ -260,6 +309,8 @@ def main() -> int:
         status = "попадание" if entry["hit"] else ("промах" if entry["hit"] is False else "нет ответа")
         distance = entry["distance_px"]
         detail = f", отклонение {distance} px" if distance is not None else ""
+        if entry.get("image_grid"):
+            detail += f", сетка модели {entry['image_grid']['size']}"
         print(f"  {name:<8} {outcome['ms']:>7} мс -> {status}{detail}"
               f" | ответ: {outcome['text'][:70].replace(chr(10), ' ')}")
 

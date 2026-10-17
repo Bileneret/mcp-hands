@@ -1,0 +1,180 @@
+{
+ "window": {
+  "hwnd": "0x4b1958",
+  "pid": 7764,
+  "exe": "python.exe",
+  "title": "MCP-Hands VLM target",
+  "rect": {
+   "left": 175,
+   "top": 175,
+   "right": 1300,
+   "bottom": 875
+  }
+ },
+ "model": "Qwen/Qwen3-VL-2B-Instruct",
+ "targets": [
+  "alpha",
+  "beta",
+  "gamma"
+ ],
+ "ground_truth": {
+  "alpha": {
+   "left": 210,
+   "top": 239,
+   "right": 460,
+   "bottom": 352,
+   "center": [
+    335,
+    295
+   ]
+  },
+  "beta": {
+   "left": 560,
+   "top": 464,
+   "right": 810,
+   "bottom": 577,
+   "center": [
+    685,
+    520
+   ]
+  },
+  "gamma": {
+   "left": 335,
+   "top": 639,
+   "right": 585,
+   "bottom": 752,
+   "center": [
+    460,
+    695
+   ]
+  }
+ },
+ "activated": true,
+ "crop": {
+  "ms": 1536.53,
+  "size": [
+   1125,
+   700
+  ],
+  "source": "dxcam"
+ },
+ "load": {
+  "quantization": "4bit",
+  "cuda": true,
+  "gpu": "NVIDIA GeForce GTX 1650",
+  "vram_total_mb": 4096,
+  "load_ms": 7732,
+  "vram_used_mb": 1586,
+  "vram_reserved_mb": 1644,
+  "device_map": "—"
+ },
+ "describe": {
+  "text": "На изображении показано окно приложения с заголовком \"MCP-Hands VLM target\". Окно имеет стандартные элементы управления: кнопки для закрытия окна (в правом вер",
+  "ms": 41469.6,
+  "prompt_tokens": 432,
+  "tokens": 48,
+  "image_grid": {
+   "patches": [
+    1,
+    30,
+    50
+   ],
+   "size": [
+    1400,
+    840
+   ]
+  },
+  "tokens_per_second": 1.2
+ },
+ "grounding": [
+  {
+   "name": "alpha",
+   "ms": 41278.6,
+   "raw": "```json\n{\"found\": true, \"x\": 111, \"y\": 111, \"width\": 149, \"height\": 69}\n```",
+   "parsed": {
+    "found": true,
+    "x": 111,
+    "y": 111,
+    "width": 149,
+    "height": 69
+   },
+   "image_grid": {
+    "patches": [
+     1,
+     30,
+     50
+    ],
+    "size": [
+     1400,
+     840
+    ]
+   },
+   "hit": true,
+   "distance_px": 11.0,
+   "point_on_screen": [
+    324.1,
+    296.2
+   ]
+  },
+  {
+   "name": "beta",
+   "ms": 41221.1,
+   "raw": "```json\n{\"found\": true, \"x\": 412, \"y\": 425, \"width\": 240, \"height\": 140}\n```",
+   "parsed": {
+    "found": true,
+    "x": 412,
+    "y": 425,
+    "width": 240,
+    "height": 140
+   },
+   "image_grid": {
+    "patches": [
+     1,
+     30,
+     50
+    ],
+    "size": [
+     1400,
+     840
+    ]
+   },
+   "hit": false,
+   "distance_px": 106.6,
+   "point_on_screen": [
+    602.5,
+    587.5
+   ]
+  },
+  {
+   "name": "gamma",
+   "ms": 42096.7,
+   "raw": "```json\n{\"found\": true, \"x\": 194, \"y\": 695, \"width\": 188, \"height\": 54}\n```",
+   "parsed": {
+    "found": true,
+    "x": 194,
+    "y": 695,
+    "width": 188,
+    "height": 54
+   },
+   "image_grid": {
+    "patches": [
+     1,
+     30,
+     50
+    ],
+    "size": [
+     1400,
+     840
+    ]
+   },
+   "hit": false,
+   "distance_px": 97.7,
+   "point_on_screen": [
+    406.4,
+    776.7
+   ]
+  }
+ ],
+ "hits": 1,
+ "hit_rate": 0.333
+}

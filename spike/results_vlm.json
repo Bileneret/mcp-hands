@@ -1,7 +1,7 @@
 {
  "window": {
-  "hwnd": "0x451958",
-  "pid": 27336,
+  "hwnd": "0x4b1958",
+  "pid": 7764,
   "exe": "python.exe",
   "title": "MCP-Hands VLM target",
   "rect": {
@@ -51,7 +51,7 @@
  },
  "activated": true,
  "crop": {
-  "ms": 1615.59,
+  "ms": 1579.67,
   "size": [
    1125,
    700
@@ -63,36 +63,66 @@
   "cuda": true,
   "gpu": "NVIDIA GeForce GTX 1650",
   "vram_total_mb": 4096,
-  "load_ms": 8121,
+  "load_ms": 7854,
   "vram_used_mb": 1586,
   "vram_reserved_mb": 1644,
   "device_map": "—"
  },
  "describe": {
-  "text": "На скриншоте показано окно приложения с заголовком \"MCP-Hands VLM target\". Окно имеет стандартные элементы управления: кнопки для закрытия и минимизации ок",
-  "ms": 39880.8,
+  "text": "На скриншоте показано окно приложения с заголовком \"MCP-Hands VLM target\". Окно имеет стандартные элементы управления: кнопки для закрытия окна («X",
+  "ms": 41735.2,
   "prompt_tokens": 432,
   "tokens": 48,
+  "image_grid": {
+   "patches": [
+    1,
+    30,
+    50
+   ],
+   "patch_size": 16,
+   "size": [
+    800,
+    480
+   ],
+   "llm_tokens": 375
+  },
   "tokens_per_second": 1.2
  },
  "grounding": [
   {
    "name": "alpha",
-   "ms": 40182.6,
-   "raw": "```json\n{\"found\": true, \"x\": 101, \"y\": 120, \"width\": 150, \"height\": 60}\n```",
+   "ms": 41026.1,
+   "raw": "```json\n{\"found\": true, \"x\": 111, \"y\": 111, \"width\": 150, \"height\": 60}\n```",
    "parsed": {
     "found": true,
-    "x": 101,
-    "y": 120,
+    "x": 111,
+    "y": 111,
     "width": 150,
     "height": 60
    },
+   "image_grid": {
+    "patches": [
+     1,
+     30,
+     50
+    ],
+    "patch_size": 16,
+    "size": [
+     800,
+     480
+    ],
+    "llm_tokens": 375
+   },
    "hit": false,
-   "distance_px": 292.2
+   "distance_px": 132.8,
+   "point_on_screen": [
+    436.6,
+    380.6
+   ]
   },
   {
    "name": "beta",
-   "ms": 40121.3,
+   "ms": 41413.3,
    "raw": "```json\n{\"found\": true, \"x\": 414, \"y\": 425, \"width\": 288, \"height\": 144}\n```",
    "parsed": {
     "found": true,
@@ -101,22 +131,56 @@
     "width": 288,
     "height": 144
    },
+   "image_grid": {
+    "patches": [
+     1,
+     30,
+     50
+    ],
+    "patch_size": 16,
+    "size": [
+     800,
+     480
+    ],
+    "llm_tokens": 375
+   },
    "hit": false,
-   "distance_px": 287.2
+   "distance_px": 468.7,
+   "point_on_screen": [
+    959.7,
+    899.8
+   ]
   },
   {
    "name": "gamma",
-   "ms": 40464.3,
-   "raw": "```json\n{\"found\": true, \"x\": 200, \"y\": 680, \"width\": 240, \"height\": 50}\n```",
+   "ms": 41076.9,
+   "raw": "```json\n{\"found\": true, \"x\": 194, \"y\": 695, \"width\": 194, \"height\": 54}\n```",
    "parsed": {
     "found": true,
-    "x": 200,
-    "y": 680,
-    "width": 240,
-    "height": 50
+    "x": 194,
+    "y": 695,
+    "width": 194,
+    "height": 54
+   },
+   "image_grid": {
+    "patches": [
+     1,
+     30,
+     50
+    ],
+    "patch_size": 16,
+    "size": [
+     800,
+     480
+    ],
+    "llm_tokens": 375
    },
    "hit": false,
-   "distance_px": 260.4
+   "distance_px": 547.2,
+   "point_on_screen": [
+    584.2,
+    1227.9
+   ]
   }
  ],
  "hits": 0,
