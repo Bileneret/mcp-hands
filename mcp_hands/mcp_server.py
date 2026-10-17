@@ -35,6 +35,14 @@ from mcp.server.mcpserver import MCPServer
 
 LOG_PATH = Path(__file__).resolve().parents[1] / "logs" / "mcp_calls.log"
 
+# Канонический набор инструментов: единый источник истины для сквозных тестов,
+# реестра задач бенчмарка и текста системного промпта планировщика. Расширение
+# набора — сознательная операция: стоп-лист безопасности работает «отсутствием».
+TOOL_NAMES = frozenset({
+    "windows_list", "element_find", "element_text", "content_map", "ocr_window",
+    "window_activate", "click_node", "type_text", "hotkey",
+    "notepad_run", "word_pdf_run", "browser_links_run", "health"})
+
 server = MCPServer(
     name="mcp-hands",
     title="MCP-Hands",

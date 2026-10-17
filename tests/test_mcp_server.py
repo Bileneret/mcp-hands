@@ -18,10 +18,7 @@ from mcp.client._memory import InMemoryTransport
 
 import mcp_hands.mcp_server as ms
 
-EXPECTED_TOOLS = {
-    "windows_list", "element_find", "element_text", "content_map", "ocr_window",
-    "window_activate", "click_node", "type_text", "hotkey",
-    "notepad_run", "word_pdf_run", "browser_links_run", "health"}
+EXPECTED_TOOLS = ms.TOOL_NAMES  # канонический набор — единый источник истины в сервере
 
 
 def _call(coro):
