@@ -126,7 +126,9 @@ def run_scenario(scenario, repeats: int = 1, name: str = "", artifacts: Path | N
         if verbose:
             for step in run.steps:
                 mark = "ок " if step.ok else "ОШИБКА"
-                print(f"   [{mark}] {step.title:<44} {step.ms:7.0f} мс  {step.evidence[:60]}")
+                # Причину отказа печатаем обязательно: без неё разбор прогона невозможен.
+                note = step.evidence if step.ok else (step.error or step.evidence or "без пояснения")
+                print(f"   [{mark}] {step.title:<44} {step.ms:7.0f} мс  {note[:70]}")
     passed = sum(1 for item in results if item["ok"])
     return {"scenario": title, "attempts": len(results), "passed": passed,
             "failed": len(results) - passed, "results": results}

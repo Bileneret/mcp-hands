@@ -61,7 +61,7 @@ def test_hotkey_puts_virtual_key_into_vk():
     """Виртуальная клавиша обязана уходить в `wVk`: иначе Windows игнорирует событие."""
     actuator = Actuator()
     with Capture(actuator) as capture:
-        actuator.hotkey(VK_CONTROL, VK_S)
+        actuator.hotkey(VK_CONTROL, VK_S, allow_any_window=True)
     keys = [event for event in capture.events if event["kind"] == "key"]
     assert [event["vk"] for event in keys[:2]] == [VK_CONTROL, VK_S], \
         f"клавиши ушли не в wVk: {keys}"
@@ -86,7 +86,7 @@ def test_type_text_encodes_astral_characters():
     """Эмодзи отправляется суррогатной парой, а не обрезанным кодом."""
     actuator = Actuator()
     with Capture(actuator) as capture:
-        result = actuator.type_text("ок🚀")
+        result = actuator.type_text("ок🚀", allow_any_window=True)
     units = [event["scan"] for event in capture.events if event["kind"] == "key"]
     expected: list[int] = []
     for char in "ок🚀":
@@ -101,7 +101,7 @@ def test_type_text_encodes_astral_characters():
 def test_type_text_keeps_cyrillic_intact():
     actuator = Actuator()
     with Capture(actuator) as capture:
-        actuator.type_text("Отчёт")
+        actuator.type_text("Отчёт", allow_any_window=True)
     units = [event["scan"] for event in capture.events if event["kind"] == "key"]
     assert units[::2] == [ord(char) for char in "Отчёт"]
 

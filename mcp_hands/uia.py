@@ -385,6 +385,50 @@ def element_text(element, max_length: int = -1) -> str:
         return ""
 
 
+def find_child_element(automation, element, control_type: str = "", name: str = ""):
+    """Первый потомок по типу или имени — чтобы нажать его через UIA-паттерн.
+
+    Условия поиска создаёт объект автоматизации: `CreatePropertyCondition` — его метод,
+    а не функция модуля (на этом легко ошибиться и получить AttributeError).
+    """
+    conditions = []
+    if control_type and control_type in CONTROL_TYPE_IDS:
+        conditions.append(automation.CreatePropertyCondition(UIA.UIA_ControlTypePropertyId,
+                                                             CONTROL_TYPE_IDS[control_type]))
+    if name:
+        conditions.append(automation.CreatePropertyCondition(UIA.UIA_NamePropertyId, name))
+    if not conditions:
+        return None
+    condition = conditions[0] if len(conditions) == 1 else automation.CreateAndCondition(*conditions)
+    found = element.FindFirst(UIA.TreeScope_Descendants, condition)
+    return found if found else None
+
+
+def select_element(element) -> bool:
+    """Выбирает элемент через UIA (вкладку, пункт списка) — без нажатий клавиш."""
+    try:
+        pattern = element.GetCurrentPattern(UIA.UIA_SelectionItemPatternId)
+        pattern.QueryInterface(UIA.IUIAutomationSelectionItemPattern).Select()
+        return True
+    except Exception:  # noqa: BLE001 — паттерн есть не у всех элементов
+        return False
+
+
+def invoke_element(element) -> bool:
+    """Нажимает элемент через UIA — без физического ввода.
+
+    Так закрываются вкладки: у вкладки есть кнопка закрытия, и её можно нажать
+    программно. Физические клавиши для этого не нужны вовсе, а значит невозможен
+    и уход нажатия в чужое приложение.
+    """
+    try:
+        pattern = element.GetCurrentPattern(UIA.UIA_InvokePatternId)
+        pattern.QueryInterface(UIA.UIA_InvokePattern).Invoke()
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def cached_children(element) -> list:
     """Дети из кэша: без межпроцессного вызова, но NULL у листьев."""
     try:

@@ -299,6 +299,40 @@ class Actuator:
     def foreground(self) -> int:
         return int(self.user32.GetForegroundWindow() or 0)
 
+    def foreground_info(self) -> dict:
+        """Что сейчас на переднем плане: нужно для внятного отказа."""
+        hwnd = self.foreground()
+        if not hwnd:
+            return {"hwnd": 0, "title": "", "exe": ""}
+        buffer = ctypes.create_unicode_buffer(256)
+        self.user32.GetWindowTextW(hwnd, buffer, 256)
+        pid = ctypes.wintypes.DWORD()
+        self.user32.GetWindowThreadProcessId(wintypes.HWND(hwnd), ctypes.byref(pid))
+        return {"hwnd": hwnd, "title": buffer.value, "pid": pid.value}
+
+    def guard_keyboard(self, expect_hwnd: int, allow_any_window: bool = False) -> dict:
+        """Проверяет, что ввод уйдёт именно в ожидаемое окно.
+
+        Клавиши действуют на то окно, которое активно ПРЯМО СЕЙЧАС. Если это не наша
+        цель, нажатие уходит в чужое приложение — так `Ctrl+W`, отправленный ради
+        закрытия своей вкладки, закрывал вкладки браузера и чужие программы. Поэтому:
+
+          * обычный путь — указать `expect_hwnd`, и ввод выполняется только при совпадении;
+          * без `expect_hwnd` ввод запрещён; осознанный обход — `allow_any_window=True`.
+        """
+        if allow_any_window:
+            return {"ok": True, "how": "явно разрешено любое окно"}
+        if not expect_hwnd:
+            return {"ok": False, "reason": "не указано ожидаемое окно: ввод отменён, "
+                                           "чтобы нажатие не ушло в чужое приложение "
+                                           "(обход: allow_any_window=True)"}
+        current = self.foreground()
+        if current != expect_hwnd:
+            return {"ok": False, "expected": expect_hwnd,
+                    "reason": f"активно не наше окно ({hex(current)} "
+                              f"{self.foreground_info()['title'][:40]!r}) — нажатие отменено"}
+        return {"ok": True, "how": "наше окно активно"}
+
     # --- активация --------------------------------------------------------
 
     def can_control(self, pid: int) -> dict:
@@ -425,7 +459,8 @@ class Actuator:
 
     # --- клавиатура -------------------------------------------------------
 
-    def type_text(self, text: str, char_delay_s: float = 0.012) -> dict:
+    def type_text(self, text: str, char_delay_s: float = 0.012, expect_hwnd: int = 0,
+                  allow_any_window: bool = False) -> dict:
         """Ввод текста через SendInput в режиме Unicode: кириллица и символы вне BMP.
 
         Строка переводится в 16-битные code units UTF-16: символы вне основной плоскости
@@ -437,6 +472,10 @@ class Actuator:
         теряют часть символов при плотном потоке событий — замерено, что из 30 знаков
         доходило около половины. 12 мс на символ незаметны для задачи и убирают потери.
         """
+        guard = self.guard_keyboard(expect_hwnd, allow_any_window)
+        if not guard["ok"]:
+            return {"ok": False, "chars": 0, "reason": guard["reason"]}
+
         units: list[int] = []
         for char in text:
             encoded = char.encode("utf-16-le")
@@ -458,7 +497,8 @@ class Actuator:
         return {"ok": True, "chars": len(text), "code_units": len(units), "returns": returns}
 
     def type_text_verified(self, text: str, read_back, attempts: int = 3,
-                           char_delay_s: float = 0.012, settle_s: float = 0.4) -> dict:
+                           char_delay_s: float = 0.012, settle_s: float = 0.4,
+                           expect_hwnd: int = 0, allow_any_window: bool = False) -> dict:
         """Вводит текст и ПРОВЕРЯЕТ, что он дошёл; при потере — очищает и повторяет.
 
         Постусловие важнее вызова: приложение может потерять часть символов (WinUI-Блокнот
@@ -467,14 +507,19 @@ class Actuator:
         """
         last = ""
         for attempt in range(1, max(1, attempts) + 1):
-            self.type_text(text, char_delay_s=char_delay_s)
+            typing = self.type_text(text, char_delay_s=char_delay_s, expect_hwnd=expect_hwnd,
+                                    allow_any_window=allow_any_window)
+            if not typing.get("ok"):
+                return {"ok": False, "attempts": attempt, "reason": typing.get("reason", ""),
+                        "observed": last[:120]}
             time.sleep(settle_s)
             last = read_back() or ""
             if same_text(last, text):
                 return {"ok": True, "attempts": attempt, "chars": len(text),
                         "observed": last[:120]}
             # Очищаем поле и пробуем снова: Ctrl+A, затем Delete.
-            self.hotkey(VK_CONTROL, VK_A)
+            self.hotkey(VK_CONTROL, VK_A, expect_hwnd=expect_hwnd,
+                        allow_any_window=allow_any_window)
             time.sleep(0.1)
             self._send((INPUT_KEYBOARD, 0, 0, 0, VK_DELETE),
                        (INPUT_KEYBOARD, KEYEVENTF_KEYUP, 0, 0, VK_DELETE))
@@ -483,7 +528,11 @@ class Actuator:
                 "observed": last[:120],
                 "reason": "текст не дошёл до поля целиком"}
 
-    def hotkey(self, *virtual_keys: int) -> dict:
+    def hotkey(self, *virtual_keys: int, expect_hwnd: int = 0,
+               allow_any_window: bool = False) -> dict:
+        guard = self.guard_keyboard(expect_hwnd, allow_any_window)
+        if not guard["ok"]:
+            return {"ok": False, "keys": list(virtual_keys), "reason": guard["reason"]}
         for key in virtual_keys:
             self._send((INPUT_KEYBOARD, 0, 0, 0, key))
         for key in reversed(virtual_keys):
