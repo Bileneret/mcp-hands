@@ -1,0 +1,72 @@
+{
+ "transport": "stdio (отдельный процесс)",
+ "cycles": [
+  {
+   "ok": true,
+   "steps": {
+    "activate": true,
+    "find": true,
+    "click": true,
+    "text_read": true,
+    "ocr": true
+   },
+   "ms": 2608.3,
+   "cycle": 1,
+   "one_click_landed": true
+  },
+  {
+   "ok": true,
+   "steps": {
+    "activate": true,
+    "find": true,
+    "click": true,
+    "text_read": true,
+    "ocr": true
+   },
+   "ms": 490.5,
+   "cycle": 2,
+   "one_click_landed": true
+  },
+  {
+   "ok": true,
+   "steps": {
+    "activate": true,
+    "find": true,
+    "click": true,
+    "text_read": true,
+    "ocr": true
+   },
+   "ms": 503.5,
+   "cycle": 3,
+   "one_click_landed": true
+  },
+  {
+   "ok": true,
+   "steps": {
+    "activate": true,
+    "find": true,
+    "click": true,
+    "text_read": true,
+    "ocr": true
+   },
+   "ms": 499.2,
+   "cycle": 4,
+   "one_click_landed": true
+  },
+  {
+   "ok": true,
+   "steps": {
+    "activate": true,
+    "find": true,
+    "click": true,
+    "text_read": true,
+    "ocr": true
+   },
+   "ms": 493.6,
+   "cycle": 5,
+   "one_click_landed": true
+  }
+ ],
+ "init_s": 1.229,
+ "health": true
+}
