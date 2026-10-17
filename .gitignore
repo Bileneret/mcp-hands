@@ -50,3 +50,6 @@ secrets/
 Thumbs.db
 desktop.ini
 .zcode/
+
+# Локальный конфиг агента: ключи и адреса LLM — никогда не в git
+config.local.json
