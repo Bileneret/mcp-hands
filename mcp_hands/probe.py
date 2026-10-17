@@ -53,6 +53,14 @@ class ProbeTimeout(RuntimeError):
     """Сателлит не уложился в бюджет: процесс убит, следующий вызов поднимет новый."""
 
 
+class ProbeAborted(RuntimeError):
+    """Вызов прерван наблюдателем: сателлит снят, пока операция ещё выполнялась.
+
+    Так работает слежение за модальными окнами: пока COM-вызов идёт в сателлите,
+    родитель обязан что-то проверять, а не спать в ожидании ответа.
+    """
+
+
 class ProbeError(RuntimeError):
     """Операция завершилась ошибкой внутри сателлита (не таймаут)."""
 
@@ -71,7 +79,10 @@ class ProbeProcess:
         # друг друга и при снятии убивают чужие процессы.
         self.pid_file = _Path(pid_file) if pid_file else (
             _Path(tempfile.gettempdir()) / f"{name}_{os.getpid()}_{id(self)}.pids.json")
-        self.pid_file.unlink(missing_ok=True)
+        if pid_file is None:
+            # Свой файл начинаем с чистого листа; переданный извне — НЕ трогаем:
+            # именно из него наследник узнаёт процессы снятого супервизора.
+            self.pid_file.unlink(missing_ok=True)
         self.default_timeout_s = default_timeout_s
         self.name = name
         self.stats = ProbeStats()
@@ -242,7 +253,8 @@ class ProbeProcess:
 
     # --- реестр процессов, созданных сателлитом ---------------------------
 
-    def register_external(self, pid: int, image: str = "", note: str = "") -> None:
+    def register_external(self, pid: int, image: str = "", note: str = "",
+                          created: int | None = None) -> None:
         """Регистрирует процесс, о котором сателлит сообщил через файл-реестр.
 
         Нужно потому, что COM-сервер (Word) создаётся ВНУТРИ воркера. Если воркер
@@ -251,7 +263,11 @@ class ProbeProcess:
         читает файл в момент аварийного снятия — независимо от состояния воркера.
         """
         if pid and pid > 0 and pid not in self._tracked:
-            self._tracked[pid] = {"note": note or "из реестра сателлита", "image": image}
+            # Время создания обязательно переносим из реестра: без него отключается
+            # защита от убийства процесса с переиспользованным номером.
+            self._tracked[pid] = {"note": note or "из реестра сателлита", "image": image,
+                                  "created": created if created is not None
+                                  else self.process_identity(pid)["created"]}
 
     def sync_from_registry(self) -> list[dict]:
         """Подбирает процессы, записанные сателлитом в файл-реестр."""
@@ -267,7 +283,8 @@ class ProbeProcess:
         for entry in entries if isinstance(entries, list) else []:
             pid = int(entry.get("pid", 0))
             if pid and pid not in self._tracked:
-                self.register_external(pid, entry.get("image", ""), entry.get("note", ""))
+                self.register_external(pid, entry.get("image", ""), entry.get("note", ""),
+                                       entry.get("created"))
                 added.append(entry)
         return added
 
@@ -302,8 +319,15 @@ class ProbeProcess:
 
     # --- вызов ------------------------------------------------------------
 
-    def call(self, op: str, timeout_s: float | None = None, **kwargs) -> object:
-        """Выполняет операцию в сателлите. Таймаут — убийство процесса, а не ожидание."""
+    def call(self, op: str, timeout_s: float | None = None, on_tick=None,
+             tick_s: float = 0.1, **kwargs) -> object:
+        """Выполняет операцию в сателлите. Таймаут — убийство процесса, а не ожидание.
+
+        `on_tick` вызывается каждые `tick_s` секунд, ПОКА операция идёт. Если вернёт
+        непустое значение — вызов прерывается, сателлит снимается, а наружу уходит
+        `ProbeAborted` с причиной. Так наблюдают за модальными окнами: ждать ответа
+        молча нельзя, иначе сторож узнаёт о препятствии только по истечении бюджета.
+        """
         budget = timeout_s if timeout_s is not None else self.default_timeout_s
         if not self.alive:
             self.start()
@@ -315,13 +339,25 @@ class ProbeProcess:
             self.kill()
             raise ProbeError(f"канал сателлита недоступен: {exc}") from exc
 
-        if not self._connection.poll(budget):
-            elapsed = (time.perf_counter() - started) * 1000.0
-            self.stats.timeouts += 1
-            self.stats.record(op, elapsed, "timeout")
-            self.kill()
-            raise ProbeTimeout(
-                f"операция {op!r} не ответила за {budget:.2f} с — сателлит снят и будет поднят заново")
+        while True:
+            elapsed = time.perf_counter() - started
+            remaining = budget - elapsed
+            if remaining <= 0:
+                self.stats.timeouts += 1
+                self.stats.record(op, elapsed * 1000.0, "timeout")
+                self.kill()
+                raise ProbeTimeout(
+                    f"операция {op!r} не ответила за {budget:.2f} с — сателлит снят "
+                    f"и будет поднят заново")
+            if not self._connection.poll(min(tick_s, remaining)):
+                if on_tick is not None:
+                    reason = on_tick()
+                    if reason:
+                        self.stats.record(op, elapsed * 1000.0, "aborted")
+                        self.kill()
+                        raise ProbeAborted(str(reason))
+                continue
+            break
 
         try:
             response = self._connection.recv()

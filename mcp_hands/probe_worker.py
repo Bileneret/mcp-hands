@@ -234,6 +234,13 @@ class Worker:
         return {"remaining": remaining, "replaced_all": not remaining,
                 "characters": int(document.Content.Characters.Count)}
 
+    def op_word_close_document(self, save: bool = False) -> dict:
+        """Закрывает активный документ, оставляя Word запущенным."""
+        document = self.word.ActiveDocument
+        name = str(document.Name)
+        document.Close(0 if not save else -1)  # 0 = wdDoNotSaveChanges
+        return {"closed": name, "documents_left": int(self.word.Documents.Count)}
+
     def op_word_save_as(self, path: str, as_pdf: bool = False) -> dict:
         document = self.word.ActiveDocument
         if as_pdf:
@@ -249,14 +256,17 @@ class Worker:
                 "bytes": os.path.getsize(path) if os.path.exists(path) else 0}
 
     def op_word_quit(self, save: bool = False) -> dict:
-        """Закрывает Word и снимает pid с учёта."""
+        """Закрывает Word и снимает pid с учёта.
+
+        Ссылка на COM-объект обнуляется ТОЛЬКО после успешного `Quit`. Иначе повтор
+        (на занятость сервера Word отвечает ошибкой, и вызывающий повторяет) увидел бы
+        `self._word is None` и отчитался фиктивным успехом — процесс остался бы висеть.
+        """
         if self._word is None:
             return {"closed": True, "already": True}
         pid = self._word_pid()
-        try:
-            self._word.Quit(0 if not save else -1)  # 0 = wdDoNotSaveChanges
-        finally:
-            self._word = None
+        self._word.Quit(0 if not save else -1)  # 0 = wdDoNotSaveChanges
+        self._word = None
         if pid:
             self.op_unregister_process(pid=pid)
         return {"closed": True, "pid": pid}

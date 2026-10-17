@@ -24,16 +24,42 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 
-from .probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeError, ProbeProcess, ProbeTimeout
+from pathlib import Path
+
+from .probe import (DOMAIN_OPERATION_TIMEOUT_S, ProbeAborted, ProbeError, ProbeProcess,
+                    ProbeTimeout)
+
+
+def _absolute(path: str) -> str:
+    """Приводит путь к абсолютному: относительный Word понимает по-своему.
+
+    Word сохраняет и ищет файлы относительно своей «папки документов», а не рабочего
+    каталога вызывающего процесса: без приведения пути файл окажется не там, где ждут,
+    и проверка постусловия не найдёт результат.
+    """
+    return str(Path(path).expanduser().resolve())
 
 WORD_IMAGE = "WINWORD.EXE"
 WD_FORMAT_PDF = 17
 
-#: Бюджет COM-операции. Запуск Word и экспорт PDF занимают секунды, поэтому общий
-#: бюджет прикладных операций здесь не годится. Верхняя граница задана сознательно
-#: большой: зависший на модальном диалоге вызов всё равно будет снят по этому бюджету,
-#: а разумность значения определяется замерами сценария.
-OFFICE_OPERATION_TIMEOUT_S = 90.0
+#: Бюджеты COM-операций подобраны по замерам на стенде и различаются по цене:
+#: спросить состояние — доли секунды, поднять или закрыть Word — секунды,
+#: открыть документ и напечатать PDF — десятки секунд. Единый бюджет здесь вреден:
+#: слишком большой держит зависший вызов, слишком малый срывает долгую печать.
+OFFICE_TIMEOUTS = {
+    "word_start": 30.0,
+    "word_quit": 30.0,
+    "word_status": 5.0,
+    "word_new_document": 30.0,
+    "word_open": 45.0,
+    "word_replace": 45.0,
+    "word_save_as": 60.0,
+}
+DEFAULT_OFFICE_TIMEOUT_S = 45.0
+
+
+def timeout_for(op: str) -> float:
+    return OFFICE_TIMEOUTS.get(op, DEFAULT_OFFICE_TIMEOUT_S)
 
 #: Коды «сервер занят»: Word сам просит повторить вызов.
 RPC_E_CALL_REJECTED = 0x80010001
@@ -88,12 +114,31 @@ class WordSession:
         return outcome
 
     def quit(self, save: bool = False) -> OfficeOutcome:
-        """Закрывает Word и снимает его с учёта."""
+        """Закрывает Word и снимает его с учёта.
+
+        Если штатное закрытие не удалось (Word занят, отвечает ошибкой), процесс
+        добивается принудительно: он уже под опекой, и «не закрылся» не должно означать
+        «остался висеть». Результат проверяется фактом — исчез ли процесс.
+        """
         outcome = self._call("word_quit", save=save)
-        if self.pid:
-            self.probe.untrack_process(self.pid)
+        pid = self.pid
+        if pid:
+            # `Quit` возвращает управление раньше, чем процесс действительно выходит:
+            # сразу после вызова он ещё жив. Поэтому здесь ожидание, а не разовая проверка.
+            gone = self._wait_process_gone(pid, timeout_s=15.0)
+            if not gone:
+                killed = self.probe.kill_tracked()
+                outcome.details["forced_kill"] = killed
+                outcome.reason = (outcome.reason or "закрытие не подтвердилось") + \
+                    f"; Word снят принудительно ({killed})"
+                gone = self._wait_process_gone(pid, timeout_s=5.0)
+            outcome.details["process_gone"] = gone
+            if not gone:
+                outcome.ok = False
+                outcome.reason = f"Word с pid {pid} продолжает работать после закрытия"
+            self.probe.untrack_process(pid)
             try:
-                self.probe.call("unregister_process", pid=self.pid,
+                self.probe.call("unregister_process", pid=pid,
                                 timeout_s=DOMAIN_OPERATION_TIMEOUT_S)
             except (ProbeError, ProbeTimeout):
                 pass  # сателлит мог быть снят; запись всё равно уберётся при его перезапуске
@@ -107,43 +152,63 @@ class WordSession:
 
     def open(self, path: str) -> OfficeOutcome:
         """Открывает документ. Самый опасный вызов: здесь чаще всего всплывают модалки."""
-        return self._call("word_open", path=str(path))
+        return self._call("word_open", path=_absolute(path))
 
     def replace(self, mapping: dict, match_case: bool = False) -> OfficeOutcome:
         """Заменяет плейсхолдеры во всём документе."""
         return self._call("word_replace", mapping=dict(mapping), match_case=match_case)
 
     def save_as(self, path: str, as_pdf: bool = False) -> OfficeOutcome:
-        return self._call("word_save_as", path=str(path), as_pdf=as_pdf)
+        return self._call("word_save_as", path=_absolute(path), as_pdf=as_pdf)
 
     def export_pdf(self, path: str) -> OfficeOutcome:
         """Экспорт в PDF. Word на этой операции часто отвечает «сервер занят» — повтор встроен."""
-        return self._call("word_save_as", path=str(path), as_pdf=True)
+        return self._call("word_save_as", path=_absolute(path), as_pdf=True)
 
     def status(self) -> OfficeOutcome:
         return self._call("word_status")
 
     # --- механика вызова --------------------------------------------------
 
-    def _call(self, op: str, timeout_s: float = OFFICE_OPERATION_TIMEOUT_S,
-              **kwargs) -> OfficeOutcome:
-        """Вызов COM-операции с повторами на занятость сервера и слежением за модалками."""
+    def _call(self, op: str, timeout_s: float | None = None, **kwargs) -> OfficeOutcome:
+        """Вызов COM-операции с повторами на занятость сервера и ЖИВЫМ сторожем модалок.
+
+        Сторож опрашивается, пока операция выполняется: `ProbeProcess.call` умеет звать
+        наблюдателя между короткими ожиданиями. Иначе модальное окно Word обнаружилось бы
+        только по истечении бюджета, да ещё и без имени диалога.
+        """
+        budget = timeout_s if timeout_s is not None else timeout_for(op)
         started = time.perf_counter()
         attempts = 0
         last_reason = ""
         while attempts < 3:
             attempts += 1
+            guard = None
             if self.modal_watcher is not None:
-                self.modal_watcher.check(word_pid=self.pid)
+                guard = lambda: self._modal_reason()  # noqa: E731 — короткая обёртка для колбэка
             try:
-                value = self.probe.call(op, timeout_s=timeout_s, **kwargs)
+                value = self.probe.call(op, timeout_s=budget, on_tick=guard, **kwargs)
                 outcome = OfficeOutcome(True, value=value, attempts=attempts,
                                         ms=(time.perf_counter() - started) * 1000.0)
+                self._remember(op, outcome)
+                return outcome
+            except ProbeAborted as exc:
+                outcome = OfficeOutcome(False, reason=str(exc), attempts=attempts,
+                                        modal_dialog=self._modal_reason(),
+                                        ms=(time.perf_counter() - started) * 1000.0)
+                outcome.details["budget_s"] = budget
                 self._remember(op, outcome)
                 return outcome
             except ProbeTimeout as exc:
                 outcome = OfficeOutcome(False, reason=self._timeout_reason(exc), attempts=attempts,
                                         ms=(time.perf_counter() - started) * 1000.0)
+                # Модальное окно могло появиться в последний момент: опрашиваем сторожа
+                # и в этой ветке, иначе причина отказа останется необъяснённой.
+                outcome.modal_dialog = self._modal_reason()
+                if outcome.modal_dialog:
+                    outcome.reason = (f"модальный диалог Word ({outcome.modal_dialog}): "
+                                      f"нужен человек")
+                outcome.details["budget_s"] = budget
                 self._remember(op, outcome)
                 return outcome
             except ProbeError as exc:
@@ -153,14 +218,29 @@ class WordSession:
                     continue
                 outcome = OfficeOutcome(False, reason=last_reason, attempts=attempts,
                                         ms=(time.perf_counter() - started) * 1000.0)
-                if self.modal_watcher is not None:
-                    modal = self.modal_watcher.recent(word_pid=self.pid)
-                    if modal:
-                        outcome.modal_dialog = modal
-                        outcome.reason = f"модальный диалог Word ({modal}): нужен человек"
+                outcome.modal_dialog = self._modal_reason()
+                if outcome.modal_dialog:
+                    outcome.reason = (f"модальный диалог Word ({outcome.modal_dialog}): "
+                                      f"нужен человек")
                 self._remember(op, outcome)
                 return outcome
         return OfficeOutcome(False, reason=last_reason or "операция не удалась", attempts=attempts)
+
+    def _wait_process_gone(self, pid: int, timeout_s: float) -> bool:
+        """Ждёт фактического завершения процесса: закрытие COM опережает выход Word."""
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            if not self.probe.process_identity(pid)["image"]:
+                return True
+            time.sleep(0.25)
+        return not self.probe.process_identity(pid)["image"]
+
+    def _modal_reason(self) -> str:
+        """Причина остановки, если Word показывает модальное окно, иначе пусто."""
+        if self.modal_watcher is None:
+            return ""
+        modal = self.modal_watcher.recent(word_pid=self.pid)
+        return f"модальный диалог Word ({modal}): нужен человек" if modal else ""
 
     @staticmethod
     def _is_busy(reason: str) -> bool:

@@ -77,6 +77,25 @@ class Target:
 
 
 @pytest.fixture(scope="session", autouse=True)
+def aligned_desktop():
+    """Переводит процесс тестов на рабочий стол ввода — до окон и хуков.
+
+    В изолированных сессиях (песочница, CI, раннер агента) процесс pytest живёт на
+    служебном рабочем столе, а мишень и сателлит встают на стол ввода. Хуки событий
+    изолированы рабочим столом потока, поэтому события мишени до цикла сообщений
+    не доходят. Выравнивание убирает расхождение; если переключиться не удалось
+    (например, у потока уже есть окна), тесты, которым нужен общий стол, пропускаются
+    с причиной, а не падают.
+    """
+    from mcp_hands.geometry import CoordinateSpace
+    from mcp_hands.input import Actuator
+
+    actuator = Actuator(CoordinateSpace())
+    result = actuator.attach_to_input_desktop()
+    yield result
+
+
+@pytest.fixture(scope="session", autouse=True)
 def dpi_awareness():
     """Процесс тестов обязан быть per-monitor aware, иначе координаты виртуализуются."""
     mode = enable_dpi_awareness()
@@ -115,17 +134,18 @@ def input_desktop_name() -> str:
 
 
 @pytest.fixture
-def require_input_desktop(target):
-    """Пропускает тест ввода, если окно мишени на другом рабочем столе.
+def require_input_desktop(target, aligned_desktop):
+    """Пропускает тест, если окно мишени и процесс тестов на разных рабочих столах.
 
-    В песочнице или служебном сеансе окно мишени может оказаться на параллельном столе:
-    тогда клики физически не доходят, и это отказ среды, а не поломка кода. Мишень
-    старается создаться на столе ввода сама; если не удалось — тест честно пропускается
-    с указанием обоих имён.
+    Ввод и хуки событий привязаны к рабочему столу потока: при расхождении клики
+    не доходят, а события не приходят. Это отказ среды, а не поломка кода, поэтому
+    тест пропускается с указанием обоих имён и результата выравнивания.
     """
     ours = input_desktop_name()
     if target.desktop and ours and target.desktop != ours:
-        pytest.skip(f"мишень на рабочем столе {target.desktop!r}, ввод идёт на {ours!r}")
+        pytest.skip(
+            f"мишень на рабочем столе {target.desktop!r}, процесс тестов на {ours!r}; "
+            f"выравнивание: {aligned_desktop.get('reason') or aligned_desktop.get('how')}")
 
 
 @pytest.fixture

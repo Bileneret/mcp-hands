@@ -31,7 +31,7 @@ def test_pump_starts_with_hooks(pump):
     assert health["thread_id"] > 0, "поток обязан сообщить свой идентификатор для остановки"
 
 
-def test_window_event_is_delivered(pump, target):
+def test_window_event_is_delivered(pump, target, require_input_desktop):
     """Событие о появлении окна приходит; задержка доставки — доли миллисекунды."""
     event = pump.wait_for_window(title_contains="pytest target", timeout_s=2.0)
     assert event is not None, "событие о появлении окна не получено"
@@ -42,7 +42,7 @@ def test_window_event_is_delivered(pump, target):
     assert described["kind"] in ("show", "foreground", "create")
 
 
-def test_events_are_queued_and_drained(pump, target):
+def test_events_are_queued_and_drained(pump, target, require_input_desktop):
     """События не теряются: они ждут в очереди, пока их не разберут."""
     time.sleep(0.3)
     events = pump.drain()
