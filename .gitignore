@@ -49,3 +49,4 @@ secrets/
 # Windows
 Thumbs.db
 desktop.ini
+.zcode/

@@ -158,7 +158,7 @@ def test_find_and_click_own_target(mcp_target):
 
 def test_hotkey_refusal_parallel_session(mcp_target):
     """Страж горячих клавиш отказывает, если активно ЧУЖОЕ окно (не expect_hwnd):
-    валидируем поведением, а не подменой — задача фокуса на мишень, verжидется иное."""
+    проверяем поведение, а не подмену — без фокуса на мишени нажатие не уйдёт."""
     async def case():
         async with InMemoryTransport(ms.server) as (read, write):
             async with ClientSession(read, write) as session:
@@ -171,3 +171,99 @@ def test_hotkey_refusal_parallel_session(mcp_target):
     structured = _call(case).structured_content
     assert not structured["ok"] and structured["refused"], structured
     assert "окно" in structured["reason"] or "активн" in structured["reason"], structured
+
+
+# --- dry_run: та же лестница стражей, ноль ввода -----------------------------------
+
+
+async def _dry_run_cycle(hwnd: int, node_name: str) -> dict:
+    async with InMemoryTransport(ms.server) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            found = await session.call_tool("element_find", {
+                "hwnd": hwnd, "name": node_name, "control_type": "button"})
+            node = found.structured_content["detail"]["node"]
+            click = await session.call_tool("click_node",
+                                            {"hwnd": hwnd, "node": node, "dry_run": True})
+            typed = await session.call_tool("type_text", {
+                "hwnd": hwnd, "text": "сухой прогон 🚀", "dry_run": True})
+            keys = await session.call_tool("hotkey", {
+                "hwnd": hwnd, "keys": ["CTRL", "S"], "dry_run": True})
+            return {"click": click.structured_content, "text": typed.structured_content,
+                    "hotkey": keys.structured_content}
+
+
+def test_dry_run_checks_without_input(mcp_target):
+    """dry_run по живой мишени: вердикты готовности, ноль CLICK в журнале, без активации."""
+    before = len(mcp_target.clicks())
+    result = _call(lambda: _dry_run_cycle(mcp_target.hwnd, "alpha"))
+    click = result["click"]
+    assert click["ok"] and click["detail"]["dry_run"] is True, click
+    assert click["detail"]["center"], click
+    assert click["detail"]["desktop"]["target"] == click["detail"]["desktop"]["ours"], click
+    # точка клика совпадает с центром кнопки мишени: dry_run не искажает геометрию
+    assert not mcp_target.clicks()[before:], \
+        "dry_run обязан не отправлять ввод, а в журнале мишени появились CLICK"
+    text = result["text"]
+    assert text["ok"] and text["detail"]["code_units"] > len("сухой прогон 🚀"), text
+    assert text["detail"]["dry_run"] is True
+    keys = result["hotkey"]
+    assert keys["ok"] and keys["detail"]["would_send"] == [0x11, 0x53], keys
+
+
+def test_dry_run_never_touches_actuator():
+    """dry_run в hotkey/type_text не трогает клавиатурный путь актуатора вовсе;
+    предварительно мишень назначается активной подделкой стража."""
+    calls: list[str] = []
+
+    class FakeActuator:
+        def guard_keyboard(self, expect_hwnd, allow_any_window=False):
+            calls.append("guard")
+            return {"ok": True, "expect_hwnd": expect_hwnd, "foreground": expect_hwnd}
+
+        def foreground(self):
+            return 0x4242
+
+        def hotkey(self, *_keys, **_kwargs):
+            calls.append("hotkey")
+            return {"ok": True, "keys": list(_keys)}
+
+        def type_text(self, *_args, **_kwargs):
+            calls.append("type_text")
+            return {"ok": True}
+
+        def can_control(self, _pid):
+            calls.append("can_control")
+            return {"blocked_by_uipi": False}
+
+        def own_desktop(self):
+            calls.append("own_desktop")
+            return "Default"
+
+        def window_desktop(self, _hwnd):
+            calls.append("window_desktop")
+            return "Default"
+
+        def window_alive(self, _hwnd):
+            calls.append("window_alive")
+            return True
+
+    ms._actuator = FakeActuator()
+    try:
+        async def case():
+            async with InMemoryTransport(ms.server) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    keys = await session.call_tool(
+                        "hotkey", {"hwnd": 0x4242, "keys": ["CTRL", "S"], "dry_run": True})
+                    typed = await session.call_tool(
+                        "type_text", {"hwnd": 0x4242, "text": "текст", "dry_run": True})
+                    return keys.structured_content, typed.structured_content
+        keys, typed = _call(case)
+        assert keys["ok"] and keys["detail"]["would_succeed"], keys
+        assert typed["ok"] and typed["detail"]["would_succeed"], typed
+        untouched = {"hotkey", "type_text"} & set(calls)
+        assert not untouched, f"dry_run затронул клавиатурный путь: {untouched}"
+        assert "guard" in calls, "страж должен был проверяться"
+    finally:
+        ms._actuator = None

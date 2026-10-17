@@ -271,14 +271,27 @@ def window_activate(hwnd: int) -> ToolResult:
 
 
 @server.tool(structured_output=True)
-def click_node(hwnd: int, node: dict, activate: bool = True) -> ToolResult:
+def click_node(hwnd: int, node: dict, activate: bool = True,
+               dry_run: bool = False) -> ToolResult:
     """Клик в элемент по его UIA-карточке из `element_find`: PID берётся из узла,
-    перед кликом проверяются рабочий стол и права (UIPI) — слепых кликов нет."""
+    перед кликом проверяются рабочий стол и права (UIPI) — слепых кликов нет.
+
+    `dry_run=True` прогоняет ту же цепочку проверок (узел, права, стол, живое окно)
+    и возвращает точку клика, НЕ отправляя ввод и НЕ активируя окно."""
     started = time.perf_counter()
     if not node.get("name") and not node.get("automation_id"):
         return _fail("click_node", started, "узел без имени и automation_id: висящий клик",
                      True)
     try:
+        if dry_run:
+            checks = _dry_run_click_checks(hwnd, node)
+            result = ToolResult(ok=checks["ok"], refused=False,
+                                reason="" if checks["ok"] else checks.get("reason", ""),
+                                summary="сухой прогон: клик был бы отправлен" if checks["ok"]
+                                        else "сухой прогон: клик был бы отклонён",
+                                detail=checks)
+            _journal("click_node", started, result, {"dry_run": True})
+            return result
         outcome = _act().click_node(node, pid=int(node.get("process_id") or 0),
                                     activate=activate, window_hwnd=hwnd)
     except Exception as exc:  # noqa: BLE001
@@ -295,17 +308,34 @@ def click_node(hwnd: int, node: dict, activate: bool = True) -> ToolResult:
 
 @server.tool(structured_output=True)
 def type_text(hwnd: int, text: str, verify_document: bool = False,
-              attempts: int = 3) -> ToolResult:
+              attempts: int = 3, dry_run: bool = False) -> ToolResult:
     """Ввод текста в проверенно активное окно (страж `expect_hwnd` обязателен).
 
     `verify_document=True` — после ввода перечитать документ окна (TextPattern)
     и подтвердить совпадение; режим для полей-документов (Блокнот и подобные),
     где весь текст поля и есть введённое.
+    `dry_run=True` проверяет готовность (страж активного окна, подсчёт code units
+    UTF-16 для контрольного круга) и НЕ отправляет ни одного события.
     """
     started = time.perf_counter()
     if not text:
         return _fail("type_text", started, "пустой текст", True)
     try:
+        if dry_run:
+            guard = _act().guard_keyboard(hwnd)
+            units = sum(len(char.encode("utf-16-le")) // 2 for char in text)
+            detail = {"dry_run": True, "chars": len(text), "code_units": units,
+                      "enters": text.count("\n"), "foreground": _act().foreground(),
+                      "expect_hwnd": hwnd, "would_succeed": bool(guard.get("ok")),
+                      "guard_reason": guard.get("reason", "")}
+            result = ToolResult(ok=bool(guard.get("ok")), refused=not guard.get("ok"),
+                                reason=guard.get("reason", ""),
+                                summary=("сухой прогон: ввод был бы отправлен"
+                                         if guard.get("ok")
+                                         else "сухой прогон: ввод был бы отменён стражем"),
+                                detail=detail)
+            _journal("type_text", started, result, {"dry_run": True})
+            return result
         if verify_document:
             _ensure_com()
             client = _automation()
@@ -343,11 +373,13 @@ VK_BY_NAME = {
 
 
 @server.tool(structured_output=True)
-def hotkey(hwnd: int, keys: list[str]) -> ToolResult:
+def hotkey(hwnd: int, keys: list[str], dry_run: bool = False) -> ToolResult:
     """Сочетание клавиш в проверенно активное окно, например ["CTRL", "S"].
 
     Белый список клавиш (нет): системных (WIN), F1–F12, стрелок — по соображениям
     безопасности сначала доказываем полезность с узкого набора.
+    `dry_run=True` проверяет белый список и страж активного окна, НЕ отправляя
+    ни одного события.
     """
     started = time.perf_counter()
     unknown = [key for key in keys if VK_BY_NAME.get(key.upper()) is None]
@@ -356,6 +388,21 @@ def hotkey(hwnd: int, keys: list[str]) -> ToolResult:
                      f"неизвестные или запрещённые клавиши: {unknown}; допустимо: CTRL/SHIFT/ALT "
                      f"+ буква/TAB/ENTER/ESC/DEL/BACK/SPACE/HOME/END/PAGEUP/PAGEDOWN", True)
     try:
+        if dry_run:
+            guard = _act().guard_keyboard(hwnd)
+            detail = {"dry_run": True,
+                      "would_send": [VK_BY_NAME[key.upper()] for key in keys],
+                      "foreground": _act().foreground(), "expect_hwnd": hwnd,
+                      "would_succeed": bool(guard.get("ok")),
+                      "guard_reason": guard.get("reason", "")}
+            result = ToolResult(ok=bool(guard.get("ok")), refused=not guard.get("ok"),
+                                reason=guard.get("reason", ""),
+                                summary=("сухой прогон: нажатие было бы отправлено"
+                                         if guard.get("ok")
+                                         else "сухой прогон: нажатие было бы отменено"),
+                                detail=detail)
+            _journal("hotkey", started, result, {"keys": keys, "dry_run": True})
+            return result
         outcome = _act().hotkey(*(VK_BY_NAME[key.upper()] for key in keys), expect_hwnd=hwnd)
     except Exception as exc:  # noqa: BLE001
         return _fail("hotkey", started, f"{type(exc).__name__}: {exc}", keys=keys)
@@ -370,6 +417,37 @@ def hotkey(hwnd: int, keys: list[str]) -> ToolResult:
 
 
 # --- доменные сценарии ------------------------------------------------------------
+
+
+def _dry_run_click_checks(hwnd: int, node: dict) -> dict:
+    """Проверки dry_run для клика: та же лестница стражей ядра, ни одного ввода."""
+    checks: dict = {"dry_run": True, "ok": False}
+    rect = node.get("rect")
+    if not rect:
+        checks["reason"] = "у элемента нет прямоугольника"
+        return checks
+    checks["center"] = node.get("center") or [(rect[0] + rect[2]) // 2,
+                                              (rect[1] + rect[3]) // 2]
+    pid = int(node.get("process_id") or 0)
+    checks["pid"] = pid
+    act = _act()
+    if pid:
+        rights = act.can_control(pid)
+        checks["rights"] = rights
+        if rights.get("blocked_by_uipi"):
+            checks["reason"] = "целевое окно с более высокими правами: ввод не дойдёт (UIPI)"
+            return checks
+    ours, theirs = act.own_desktop(), act.window_desktop(hwnd)
+    checks["desktop"] = {"ours": ours, "target": theirs}
+    if ours and theirs and not ours.startswith("<") and not theirs.startswith("<") \
+            and ours != theirs:
+        checks["reason"] = f"окно цели на столе {theirs!r}, ввод идёт на {ours!r}"
+        return checks
+    if not act.window_alive(hwnd):
+        checks["reason"] = "окно цели больше не существует"
+        return checks
+    checks["ok"] = True
+    return checks
 
 
 def _run_domain(tool: str, module_name: str) -> ToolResult:

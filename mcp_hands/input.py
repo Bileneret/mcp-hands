@@ -299,6 +299,10 @@ class Actuator:
     def foreground(self) -> int:
         return int(self.user32.GetForegroundWindow() or 0)
 
+    def window_alive(self, hwnd: int) -> bool:
+        """Дескриптор и окно существует: проверка dry_run без побочных эффектов."""
+        return bool(self.user32.IsWindow(hwnd))
+
     def foreground_info(self) -> dict:
         """Что сейчас на переднем плане: нужно для внятного отказа."""
         hwnd = self.foreground()
