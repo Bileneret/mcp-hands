@@ -25,6 +25,10 @@ from .geometry import CoordinateSpace, point_in_rect
 
 INPUT_MOUSE = 0
 INPUT_KEYBOARD = 1
+
+# Сколько времени активация окна перебирает приёмы передачи фокуса. Бюджет операций
+# сателлита обязан быть больше этого значения (см. probe.DOMAIN_OPERATION_TIMEOUT_S).
+ACTIVATION_TIMEOUT_S = 1.5
 MOUSEEVENTF_MOVE = 0x0001
 MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
@@ -274,7 +278,7 @@ class Actuator:
                    and theirs["level"] > ours["level"])
         return {"ours": ours, "target": theirs, "blocked_by_uipi": blocked}
 
-    def activate(self, hwnd: int, timeout_s: float = 1.5) -> dict:
+    def activate(self, hwnd: int, timeout_s: float = ACTIVATION_TIMEOUT_S) -> dict:
         """Делает окно активным. Прямой вызов часто отклоняется Windows, поэтому три приёма."""
         handle = wintypes.HWND(hwnd)
         if self.foreground() == hwnd:

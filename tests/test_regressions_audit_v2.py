@@ -67,7 +67,7 @@ def test_covers_is_strict_but_intersects_is_not():
     assert grabber.intersects(frame, oversized), "видимая часть есть — кроп обязан работать"
 
 
-def test_crop_window_handles_maximized_window(target):
+def test_crop_window_handles_maximized_window(target, require_capture):
     """Развёрнутое окно снимается, а не отбрасывается проверкой включения."""
     import ctypes
     import ctypes.wintypes as wintypes

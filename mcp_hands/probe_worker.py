@@ -86,6 +86,26 @@ class Worker:
         """
         return self._desktop_info
 
+    def op_unregister_process(self, pid: int) -> dict:
+        """Убирает процесс из файла-реестра при штатном завершении.
+
+        Без этого после корректного `word.Quit()` в реестре остаётся запись, и при
+        следующем аварийном снятии супервизор попытается убить уже несуществующий
+        (или, хуже, переиспользованный) процесс.
+        """
+        import json
+
+        if not self.pid_file:
+            return {"ok": False, "reason": "файл-реестр не задан"}
+        path = __import__("pathlib").Path(self.pid_file)
+        if not path.exists():
+            return {"ok": True, "removed": 0}
+        with __import__("contextlib").suppress(ValueError, OSError):
+            entries = json.loads(path.read_text(encoding="utf-8")) or []
+        remaining = [entry for entry in entries if int(entry.get("pid", 0)) != pid]
+        path.write_text(json.dumps(remaining, ensure_ascii=False), encoding="utf-8")
+        return {"ok": True, "removed": len(entries) - len(remaining), "total": len(remaining)}
+
     def op_register_process(self, pid: int, image: str = "", note: str = "") -> dict:
         """Записывает процесс в файл-реестр: супервизор подберёт его при аварийном снятии.
 
@@ -102,8 +122,12 @@ class Worker:
         if path.exists():
             with __import__("contextlib").suppress(ValueError, OSError):
                 entries = json.loads(path.read_text(encoding="utf-8")) or []
+        from .probe import ProbeProcess
+
+        identity = ProbeProcess.process_identity(pid)
         entries = [entry for entry in entries if int(entry.get("pid", 0)) != pid]
-        entries.append({"pid": pid, "image": image, "note": note})
+        entries.append({"pid": pid, "image": image or identity["image"],
+                        "created": identity["created"], "note": note})
         path.write_text(json.dumps(entries, ensure_ascii=False), encoding="utf-8")
         return {"ok": True, "registered": pid, "total": len(entries)}
 
@@ -148,8 +172,9 @@ class Worker:
             time.sleep(0.05)
             landed = self.actuator.cursor()
             return {"ok": True, "moved_only": True, "center": center, "landed": list(landed)}
-        window = next((w for w in self.op_windows() if w["hwnd"] == hwnd), None)
-        return self.actuator.click_node(node, pid=window["pid"] if window else 0,
+        # PID берётся из самого узла UIA: обход всех окон системы ради того же числа
+        # стоил десятки-сотни миллисекунд на каждый клик (замечание аудита v3).
+        return self.actuator.click_node(node, pid=int(node.get("process_id") or 0),
                                         window_hwnd=hwnd)
 
     def op_type(self, text: str) -> dict:

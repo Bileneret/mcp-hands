@@ -57,7 +57,8 @@ _ACTION_PROPERTIES = (
     ("window", UIA.UIA_IsWindowPatternAvailablePropertyId),
 )
 MINIMAL_PROPERTIES = tuple((name, prop) for name, prop in _BASE_PROPERTIES
-                           if name in ("name", "automation_id", "control_type", "rect", "enabled"))
+                           if name in ("name", "automation_id", "control_type", "rect", "enabled",
+                                       "process_id"))
 ACTION_PROPERTIES = _BASE_PROPERTIES + _ACTION_PROPERTIES
 
 _CAMEL = {
