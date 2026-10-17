@@ -1,0 +1,124 @@
+{
+ "window": {
+  "hwnd": "0x451958",
+  "pid": 27336,
+  "exe": "python.exe",
+  "title": "MCP-Hands VLM target",
+  "rect": {
+   "left": 175,
+   "top": 175,
+   "right": 1300,
+   "bottom": 875
+  }
+ },
+ "model": "Qwen/Qwen3-VL-2B-Instruct",
+ "targets": [
+  "alpha",
+  "beta",
+  "gamma"
+ ],
+ "ground_truth": {
+  "alpha": {
+   "left": 210,
+   "top": 239,
+   "right": 460,
+   "bottom": 352,
+   "center": [
+    335,
+    295
+   ]
+  },
+  "beta": {
+   "left": 560,
+   "top": 464,
+   "right": 810,
+   "bottom": 577,
+   "center": [
+    685,
+    520
+   ]
+  },
+  "gamma": {
+   "left": 335,
+   "top": 639,
+   "right": 585,
+   "bottom": 752,
+   "center": [
+    460,
+    695
+   ]
+  }
+ },
+ "activated": true,
+ "crop": {
+  "ms": 1615.59,
+  "size": [
+   1125,
+   700
+  ],
+  "source": "dxcam"
+ },
+ "load": {
+  "quantization": "4bit",
+  "cuda": true,
+  "gpu": "NVIDIA GeForce GTX 1650",
+  "vram_total_mb": 4096,
+  "load_ms": 8121,
+  "vram_used_mb": 1586,
+  "vram_reserved_mb": 1644,
+  "device_map": "—"
+ },
+ "describe": {
+  "text": "На скриншоте показано окно приложения с заголовком \"MCP-Hands VLM target\". Окно имеет стандартные элементы управления: кнопки для закрытия и минимизации ок",
+  "ms": 39880.8,
+  "prompt_tokens": 432,
+  "tokens": 48,
+  "tokens_per_second": 1.2
+ },
+ "grounding": [
+  {
+   "name": "alpha",
+   "ms": 40182.6,
+   "raw": "```json\n{\"found\": true, \"x\": 101, \"y\": 120, \"width\": 150, \"height\": 60}\n```",
+   "parsed": {
+    "found": true,
+    "x": 101,
+    "y": 120,
+    "width": 150,
+    "height": 60
+   },
+   "hit": false,
+   "distance_px": 292.2
+  },
+  {
+   "name": "beta",
+   "ms": 40121.3,
+   "raw": "```json\n{\"found\": true, \"x\": 414, \"y\": 425, \"width\": 288, \"height\": 144}\n```",
+   "parsed": {
+    "found": true,
+    "x": 414,
+    "y": 425,
+    "width": 288,
+    "height": 144
+   },
+   "hit": false,
+   "distance_px": 287.2
+  },
+  {
+   "name": "gamma",
+   "ms": 40464.3,
+   "raw": "```json\n{\"found\": true, \"x\": 200, \"y\": 680, \"width\": 240, \"height\": 50}\n```",
+   "parsed": {
+    "found": true,
+    "x": 200,
+    "y": 680,
+    "width": 240,
+    "height": 50
+   },
+   "hit": false,
+   "distance_px": 260.4
+  }
+ ],
+ "hits": 0,
+ "hit_rate": 0.0
+}

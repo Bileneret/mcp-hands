@@ -15,5 +15,17 @@ pillow==13.0.0
 # Нативная выдача — BGRA, конвертация делается срезом numpy (cv2 не нужен).
 dxcam==0.3.0
 
-# Захват через BitBlt — только для сравнения в замерах спайка (spike/capture_dxgi.py)
+# Захват через BitBlt — резервный путь (и сравнение в замерах спайка, spike/capture_dxgi.py)
 mss==10.2.0
+
+# Локальная VLM (опциональный пиксельный путь, спайк: spike/vlm_probe.py).
+# Ставится отдельно от ядра: тянет несколько гигабайт и требует CUDA.
+#   .venv\Scripts\python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+#   .venv\Scripts\python -m pip install transformers accelerate bitsandbytes
+# Замеры этапа 0: модель влезает в 4 ГБ (1.6 ГБ в INT4), но даёт 40 с на запрос
+# и 0 попаданий из 3 — держим как опцию за capability-пробой.
+# torch==2.14.1+cu126
+# torchvision==0.29.1+cu126
+# transformers==5.20.1
+# accelerate==1.15.0
+# bitsandbytes==0.50.2
