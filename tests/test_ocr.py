@@ -18,6 +18,11 @@ from mcp_hands.uia import find_window
 pytestmark = pytest.mark.skipif(not available(), reason="в системе нет движка Windows OCR")
 
 
+@pytest.fixture(autouse=True)
+def _needs_capture(require_capture):
+    """OCR проверяется на живом кропе окна, значит нужен рабочий захват."""
+
+
 def test_ocr_reports_available_languages():
     tags = languages()
     assert tags, "список языков пуст"

@@ -59,6 +59,10 @@ class ProbeProcess:
         self.stats = ProbeStats()
         self._process: multiprocessing.Process | None = None
         self._connection = None
+        # Процессы, запущенные не как дети воркера: COM-серверы Office поднимает служба
+        # DCOM, поэтому убийство воркера их не задевает. Их надо отслеживать отдельно,
+        # иначе после каждого снятия остаётся висящий WINWORD.EXE с занятым файлом.
+        self._tracked: dict[int, str] = {}
 
     # --- жизненный цикл ---------------------------------------------------
 
@@ -75,6 +79,7 @@ class ProbeProcess:
         child.close()
 
     def stop(self) -> None:
+        self.kill_tracked()
         if self._connection is not None:
             try:
                 self._connection.send(None)  # вежливая просьба завершиться
@@ -92,8 +97,46 @@ class ProbeProcess:
                 self._process.join(1.0)
             self._process = None
 
+    # --- отслеживаемые процессы ------------------------------------------
+
+    def track_process(self, pid: int, note: str = "") -> None:
+        """Берёт процесс под опеку: он будет убит вместе с сателлитом.
+
+        Нужно для COM-серверов Office: их запускает служба DCOM, ребёнком воркера они
+        не являются, и при снятии сателлита остаются висеть, блокируя документы.
+        """
+        if pid and pid > 0:
+            self._tracked[pid] = note
+
+    def untrack_process(self, pid: int) -> None:
+        self._tracked.pop(pid, None)
+
+    def tracked_processes(self) -> list[dict]:
+        return [{"pid": pid, "note": note} for pid, note in self._tracked.items()]
+
+    def kill_tracked(self) -> list[int]:
+        """Принудительно завершает опекаемые процессы и возвращает список убитых."""
+        import subprocess
+
+        killed: list[int] = []
+        for pid, _note in list(self._tracked.items()):
+            try:
+                # text=False: taskkill отвечает в кодировке консоли, и декодирование
+                # как UTF-8 роняет поток чтения ещё до разбора результата.
+                completed = subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                                           capture_output=True, timeout=10)
+                if completed.returncode == 0:
+                    killed.append(pid)
+            except Exception:  # noqa: BLE001 — отсутствующий процесс это не ошибка
+                pass
+            self._tracked.pop(pid, None)
+        return killed
+
     def kill(self) -> None:
         """Аварийное снятие: единственный способ разблокировать зависший вызов UIA."""
+        tracked_killed = self.kill_tracked()
+        if tracked_killed:
+            self.stats.history.append({"op": "kill_tracked", "killed": tracked_killed})
         if self._process is not None:
             self._process.kill()
             self._process.join(1.0)

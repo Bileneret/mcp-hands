@@ -26,14 +26,26 @@ _ES_DISPLAY_REQUIRED = 0x00000002
 _BLACK_THRESHOLD = 4
 
 
+class ScreenCaptureError(RuntimeError):
+    """Ни один путь захвата не сработал: агенту нечем смотреть на экран."""
+
+
 @dataclass
 class Frame:
-    """Кадр в физических пикселях вместе с происхождением — иначе замеры не сравнить."""
+    """Кадр в физических пикселях вместе с происхождением — иначе замеры не сравнить.
+
+    `origin` — координаты экрана, которым соответствует левый верхний пиксель кадра.
+    У DXGI это первичный монитор, то есть (0, 0); у резервного пути через BitBlt —
+    весь виртуальный рабочий стол, который может начинаться с отрицательных значений,
+    если монитор стоит слева от основного. Без этого поля кроп окна на таком мониторе
+    либо падает, либо возвращает чужую область.
+    """
 
     image: np.ndarray
     source: str
     ms: float
     rect: dict | None = None
+    origin: tuple[int, int] = (0, 0)
     suspicious: list[str] = field(default_factory=list)
 
     @property
@@ -103,16 +115,23 @@ class ScreenGrabber:
         latest = camera.get_latest_frame()
         return (latest.copy(), "latest") if latest is not None else (None, "no-frame")
 
-    def _grab_mss(self) -> np.ndarray:
+    def _grab_mss(self) -> tuple[np.ndarray, tuple[int, int]]:
+        """Резервный путь: BitBlt по всему виртуальному рабочему столу.
+
+        Берётся `monitors[0]` (объединение мониторов), а не `monitors[1]` (первичный):
+        кадр обязан покрывать окна на любом мониторе, а начало координат может быть
+        отрицательным.
+        """
         import mss
 
         with mss.mss() as session:
-            shot = np.array(session.grab(session.monitors[1]))
-        return shot[:, :, [2, 1, 0, 3]]  # BGRA
+            area = session.monitors[0]
+            shot = np.array(session.grab(area))
+        return shot[:, :, [2, 1, 0, 3]], (area["left"], area["top"])  # BGRA
 
     # --- публичный интерфейс ---------------------------------------------
 
-    def grab(self, timeout_s: float = 0.25) -> Frame:
+    def grab(self, timeout_s: float = 0.25, prefer: str | None = None) -> Frame:
         """Кадр экрана: свежий, при неизменном экране — последний известный.
 
         Замеры: свежий кадр через DXGI стоит 5–8.5 мс, копия буфера 1.42 мс,
@@ -132,13 +151,48 @@ class ScreenGrabber:
                     source = f"mss (dxgi не дал первый кадр: {reason})"
             except Exception as exc:  # noqa: BLE001 — храним причину и уходим на резерв
                 self._dxgi_error = f"{type(exc).__name__}: {exc}"
-        if image is None:
-            image = self._grab_mss()
-            source = f"mss (dxgi: {self._dxgi_error})"
-        frame = Frame(image=image, source=source, ms=(time.perf_counter() - started) * 1000.0)
+        origin = (0, 0)
+        if image is None or prefer == "mss":
+            try:
+                image, origin = self._grab_mss()
+                source = "mss (весь виртуальный экран)" if prefer == "mss" \
+                    else f"mss (dxgi: {self._dxgi_error})"
+            except Exception as exc:  # noqa: BLE001 — оба пути обязаны дать понятный отказ
+                self.log.append({"op": "mss_failed", "error": f"{type(exc).__name__}: {exc}"})
+                raise ScreenCaptureError(
+                    "захват экрана недоступен: DXGI отдал ошибку "
+                    f"({self._dxgi_error or 'не использовался'}), резервный BitBlt тоже "
+                    f"({type(exc).__name__}: {exc})") from exc
+        frame = Frame(image=image, source=source, origin=origin,
+                      ms=(time.perf_counter() - started) * 1000.0)
         frame.suspicious = self._check(image)
         self._last, self._last_image = frame, image
         return frame
+
+    @staticmethod
+    def covers(frame: Frame, rect: dict) -> bool:
+        """Полностью ли попадает область в кадр: проверка перед кропом."""
+        offset_x, offset_y = frame.origin
+        height, width = frame.image.shape[0], frame.image.shape[1]
+        return (rect["left"] >= offset_x and rect["top"] >= offset_y
+                and rect["right"] <= offset_x + width and rect["bottom"] <= offset_y + height)
+
+    def crop_window(self, space, hwnd: int, frame: Frame | None = None) -> Frame:
+        """Кроп окна с автоподбором пути захвата под его монитор.
+
+        DXGI в текущей обвязке отдаёт первичный монитор, поэтому окно на мониторе слева
+        или справа в его кадр не попадает. Тогда берётся резервный путь: он снимает весь
+        виртуальный рабочий стол вместе с отрицательными координатами.
+        """
+        rect = space.window_frame(hwnd)
+        base = frame or self._last
+        if base is None or not self.covers(base, rect):
+            base = self.grab(prefer="mss")
+            if not self.covers(base, rect):
+                raise ScreenCaptureError(
+                    f"окно {rect} не попало даже в кадр всего виртуального экрана "
+                    f"(начало {base.origin}, размер {base.size})")
+        return self.crop(rect, base)
 
     def retry_dxgi(self) -> None:
         """Сбрасывает пометку отказа: вызывается после пробуждения дисплея."""
@@ -151,25 +205,40 @@ class ScreenGrabber:
         self._dxgi_error = None
 
     def crop(self, rect: dict, frame: Frame | None = None) -> Frame:
-        """Кроп области из имеющегося кадра: срез numpy, около 0.5 мс."""
+        """Кроп области экрана из имеющегося кадра: срез numpy, около 0.5 мс.
+
+        Координаты области — экранные; они переводятся в индексы массива через
+        начало захваченной области (`frame.origin`). На конфигурации с монитором слева
+        от основного это единственный способ получить правильный кроп.
+        """
         base = frame or self._last
         if base is None:
             raise RuntimeError("нет кадра: сначала вызовите grab()")
-        left, top = max(0, rect["left"]), max(0, rect["top"])
-        right = min(base.image.shape[1], rect["right"])
-        bottom = min(base.image.shape[0], rect["bottom"])
+        offset_x, offset_y = base.origin
+        height, width = base.image.shape[0], base.image.shape[1]
+        left = max(0, min(width, rect["left"] - offset_x))
+        top = max(0, min(height, rect["top"] - offset_y))
+        right = max(0, min(width, rect["right"] - offset_x))
+        bottom = max(0, min(height, rect["bottom"] - offset_y))
         if right <= left or bottom <= top:
-            raise ValueError(f"область кропа пуста: {rect}")
+            raise ScreenCaptureError(
+                f"область {rect} вне захваченного кадра (начало {base.origin}, "
+                f"размер {width}x{height}): нужен захват всего виртуального экрана "
+                f"(grab(prefer='mss'))")
         started = time.perf_counter()
         patch = base.image[top:bottom, left:right].copy()
-        return Frame(image=patch, source=f"{base.source}:crop",
+        return Frame(image=patch, source=f"{base.source}:crop", origin=(left + offset_x,
+                                                                      top + offset_y),
                      ms=(time.perf_counter() - started) * 1000.0,
-                     rect={"left": left, "top": top, "right": right, "bottom": bottom})
+                     rect={"left": left + offset_x, "top": top + offset_y,
+                           "right": right + offset_x, "bottom": bottom + offset_y})
 
     def _check(self, image: np.ndarray) -> list[str]:
         """Признаки «кадр подозрительный»: чёрный экран или повтор один в один."""
         issues: list[str] = []
-        if image.max() <= _BLACK_THRESHOLD:
+        # Сравниваются только каналы цвета: альфа у захвата экрана всегда 255,
+        # и по ней чёрный кадр неотличим от нормального.
+        if image[:, :, :3].max() <= _BLACK_THRESHOLD:
             issues.append("чёрный кадр")
         if self._last_image is not None and self._last_image.shape == image.shape:
             if np.array_equal(self._last_image, image):

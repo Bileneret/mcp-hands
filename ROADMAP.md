@@ -51,7 +51,14 @@
       от результата зависит, вернётся ли локальная VLM в дизайн
 - [ ] Офисный COM-исполнитель: рабочий процесс + таймаут + `kill`, детект модальных
       диалогов через `SetWinEventHook`; обработка `Protected View`,
-      `RPC_E_SERVERCALL_RETRYLATER`, реализация `IMessageFilter`
+      `RPC_E_SERVERCALL_RETRYLATER`, реализация `IMessageFilter`.
+      Требования из аудита (`reports/09_STAGE1_AUDIT.md`, раздел 2), обязательные к реализации:
+      `word.DisplayAlerts = 0` сразу после запуска; `SetErrorMode(SEM_FAILCRITICALERRORS |
+      SEM_NOGPFAULTERRORBOX)` перед открытием файлов; подписка `EventPump` на
+      `EVENT_OBJECT_SHOW` с фильтром по pid Word (модалка приходит за 50–150 мс — ждать
+      весь таймаут шага нельзя); retry-цикл (3 попытки, 100–300 мс) на `0x8001010A`
+      и `RPC_E_CALL_REJECTED`; регистрация pid Word в `ProbeProcess.track_process`
+      (механизм уже реализован и покрыт тестом)
 - [ ] 3 детерминированных сценария на чистом Python, по одному на каждый путь:
       нативный (Блокнот: открыть → вбить текст → сохранить; в WinUI диалог сохранения —
       `ContentDialog` внутри окна, а не отдельное окно, ждать изменение дерева),

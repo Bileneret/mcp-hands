@@ -22,6 +22,35 @@ from dataclasses import dataclass
 _DEFAULT_LANGUAGE = "ru"
 
 
+def _run_sync(coroutine):
+    """Выполняет корутину из синхронного кода, даже если рядом уже крутится цикл событий.
+
+    `asyncio.run` внутри работающего цикла падает с «event loop is already running»,
+    поэтому в таком окружении распознавание уводится в отдельный поток.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coroutine)
+
+    outcome: dict = {}
+
+    def runner() -> None:
+        try:
+            outcome["value"] = asyncio.run(coroutine)
+        except Exception as exc:  # noqa: BLE001 — ошибку вернём в вызывающий поток
+            outcome["error"] = exc
+
+    import threading
+
+    thread = threading.Thread(target=runner, name="mcp-hands-ocr", daemon=True)
+    thread.start()
+    thread.join()
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["value"]
+
+
 @dataclass
 class Word:
     """Слово с распознанным текстом и прямоугольником в пикселях изображения."""
@@ -88,7 +117,7 @@ class WindowsOcr:
         buffer = io.BytesIO()
         image.save(buffer, format="PNG")
         started = time.perf_counter()
-        raw = asyncio.run(self._recognize(buffer.getvalue()))
+        raw = _run_sync(self._recognize(buffer.getvalue()))
         self.last_ms = (time.perf_counter() - started) * 1000.0
         return [word.offset(*offset) for word in raw]
 

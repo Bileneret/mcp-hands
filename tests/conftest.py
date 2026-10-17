@@ -70,6 +70,29 @@ def dpi_awareness():
     return mode
 
 
+@pytest.fixture(scope="session")
+def capture_available() -> bool:
+    """Доступен ли захват экрана в этой сессии.
+
+    В ограниченных сессиях (служба, заблокированный рабочий стол) отказывают и DXGI,
+    и BitBlt — тесты, которым нужен кадр, должны пропускаться с внятной причиной,
+    а не падать, создавая ложную картину поломки кода.
+    """
+    from mcp_hands.screen import ScreenCaptureError, ScreenGrabber
+
+    try:
+        ScreenGrabber().grab(timeout_s=0.2)
+        return True
+    except ScreenCaptureError:
+        return False
+
+
+@pytest.fixture
+def require_capture(capture_available: bool) -> None:
+    if not capture_available:
+        pytest.skip("захват экрана недоступен в этой сессии: DXGI и BitBlt отказали")
+
+
 @pytest.fixture
 def target():
     """Окно-мишень с кнопками alpha, beta, gamma."""

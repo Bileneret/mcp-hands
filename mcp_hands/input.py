@@ -32,7 +32,36 @@ MOUSEEVENTF_ABSOLUTE = 0x8000
 MOUSEEVENTF_VIRTUALDESK = 0x4000
 KEYEVENTF_KEYUP = 0x0002
 KEYEVENTF_UNICODE = 0x0004
-VK_MENU = 0x12
+
+# Виртуальные клавиши, которые нужны сценариям. Значения — из Windows SDK:
+# имена не выдумываются, а берутся по спецификации, потому что «похожие» коды
+# на разных раскладках ведут себя по-разному.
+VK_BACK = 0x08
+VK_TAB = 0x09
+VK_RETURN = 0x0D
+VK_SHIFT = 0x10
+VK_CONTROL = 0x11
+VK_MENU = 0x12          # Alt
+VK_ESCAPE = 0x1B
+VK_SPACE = 0x20
+VK_PRIOR = 0x21         # Page Up
+VK_NEXT = 0x22          # Page Down
+VK_END = 0x23
+VK_HOME = 0x24
+VK_LEFT = 0x25
+VK_UP = 0x26
+VK_RIGHT = 0x27
+VK_DOWN = 0x28
+VK_DELETE = 0x2E
+VK_LWIN = 0x5B
+VK_F4 = 0x73
+VK_A = 0x41
+VK_C = 0x43
+VK_F = 0x46
+VK_S = 0x53
+VK_V = 0x56
+VK_X = 0x58
+VK_Z = 0x5A
 
 TOKEN_QUERY = 0x0008
 TOKEN_INTEGRITY_LEVEL = 25
@@ -149,15 +178,25 @@ class Actuator:
     # --- низкий уровень ---------------------------------------------------
 
     def _send(self, *spec) -> int:
+        """Отправляет события ввода.
+
+        Спецификация события — `(вид, флаги, x, y, значение)`. Для клавиатуры значение
+        означает разное в зависимости от флага: при `KEYEVENTF_UNICODE` это код символа
+        (`wScan`), иначе — виртуальная клавиша (`wVk`). Без этого разделения Windows
+        игнорирует событие: `wVk` остаётся нулевым, а `wScan` без флага `KEYEVENTF_SCANCODE`
+        не читается вовсе, и хоткей не срабатывает.
+        """
         events = (INPUT * len(spec))()
-        for index, (kind, flags, x, y, scan) in enumerate(spec):
+        for index, (kind, flags, x, y, value) in enumerate(spec):
             events[index].type = kind
             if kind == INPUT_MOUSE:
                 if flags & MOUSEEVENTF_ABSOLUTE:
                     flags |= MOUSEEVENTF_VIRTUALDESK
                 events[index].mi = MOUSEINPUT(x, y, 0, flags, 0, None)
+            elif flags & KEYEVENTF_UNICODE:
+                events[index].ki = KEYBDINPUT(0, value, flags, 0, None)
             else:
-                events[index].ki = KEYBDINPUT(0, scan, flags, 0, None)
+                events[index].ki = KEYBDINPUT(value, 0, flags, 0, None)
         return self.user32.SendInput(len(spec), events, ctypes.sizeof(INPUT))
 
     def cursor(self) -> tuple[int, int]:
@@ -214,17 +253,32 @@ class Actuator:
 
     def click(self, x: int, y: int, verify: bool = True, tolerance: int = 4,
               settle_s: float = 0.05) -> dict:
-        """Перемещение, проверка позиции курсора, нажатие."""
+        """Перемещение, проверка позиции курсора, нажатие.
+
+        Проверка курсора — страховка от промаха при смешении координатных пространств,
+        но она не должна блокировать ввод там, где система вообще не отдаёт позицию:
+        `GetCursorPos` возвращает (0,0) в неинтерактивной сессии. Тогда нажатие
+        выполняется, а результат помечается `cursor_check: "недоступен"`.
+        """
         self.move(x, y)
         if settle_s:
             time.sleep(settle_s)
         landed = self.cursor()
-        if verify and (abs(landed[0] - x) > tolerance or abs(landed[1] - y) > tolerance):
+        cursor_available = not (landed == (0, 0) and (x, y) != (0, 0))
+        if not cursor_available:
+            self.move(x, y)  # повторная попытка: возможно, ввод ещё не обработан
+            time.sleep(settle_s)
+            landed = self.cursor()
+            cursor_available = not (landed == (0, 0) and (x, y) != (0, 0))
+        if verify and cursor_available and (
+                abs(landed[0] - x) > tolerance or abs(landed[1] - y) > tolerance):
             return {"ok": False, "target": [x, y], "landed": list(landed),
+                    "cursor_check": "промах",
                     "reason": "курсор не встал на цель — нажатие отменено"}
         sent = self._send((INPUT_MOUSE, MOUSEEVENTF_LEFTDOWN, 0, 0, 0),
                           (INPUT_MOUSE, MOUSEEVENTF_LEFTUP, 0, 0, 0))
-        return {"ok": sent == 2, "target": [x, y], "landed": list(landed), "events": sent}
+        return {"ok": sent == 2, "target": [x, y], "landed": list(landed), "events": sent,
+                "cursor_check": "проверен" if cursor_available else "недоступен"}
 
     def click_node(self, node: dict, pid: int = 0, activate: bool = True) -> dict:
         """Клик по элементу: активация окна, при необходимости проверка UIPI, клик."""
@@ -248,14 +302,24 @@ class Actuator:
     # --- клавиатура -------------------------------------------------------
 
     def type_text(self, text: str, char_delay_s: float = 0.0) -> dict:
-        """Ввод текста через SendInput в режиме Unicode: работает с кириллицей."""
+        """Ввод текста через SendInput в режиме Unicode: кириллица и символы вне BMP.
+
+        Строка переводится в 16-битные code units UTF-16: символы вне основной плоскости
+        (эмодзи и прочие) отправляются суррогатной парой, как требует Windows. Прямая
+        передача `ord(char)` в 16-битное поле не падает, а **молча обрезает** код
+        (`0x1F680` превращалось в `0xF680`), вводя неверный символ.
+        """
+        units: list[int] = []
         for char in text:
-            code = ord(char)
-            self._send((INPUT_KEYBOARD, KEYEVENTF_UNICODE, 0, 0, code),
-                       (INPUT_KEYBOARD, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0, code))
+            encoded = char.encode("utf-16-le")
+            units.extend(int.from_bytes(encoded[index:index + 2], "little")
+                         for index in range(0, len(encoded), 2))
+        for unit in units:
+            self._send((INPUT_KEYBOARD, KEYEVENTF_UNICODE, 0, 0, unit),
+                       (INPUT_KEYBOARD, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP, 0, 0, unit))
             if char_delay_s:
                 time.sleep(char_delay_s)
-        return {"ok": True, "chars": len(text)}
+        return {"ok": True, "chars": len(text), "code_units": len(units)}
 
     def hotkey(self, *virtual_keys: int) -> dict:
         for key in virtual_keys:

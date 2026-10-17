@@ -170,8 +170,10 @@ class CoordinateSpace:
         area = rect or self.virtual_rect
         width = max(1, area["right"] - area["left"] - 1)
         height = max(1, area["bottom"] - area["top"] - 1)
-        return (round((x - area["left"]) * 65535 / width),
-                round((y - area["top"]) * 65535 / height))
+        # Ограничение обязательно: значение больше 65535 переполняет 16-битный регистр
+        # мыши в SendInput, и курсор улетает непредсказуемо.
+        return (max(0, min(65535, round((x - area["left"]) * 65535 / width))),
+                max(0, min(65535, round((y - area["top"]) * 65535 / height))))
 
     def from_normalized(self, nx: int, ny: int, rect: dict | None = None) -> tuple[int, int]:
         """Обратный перевод: нормализованные → физические пиксели."""
@@ -196,6 +198,16 @@ class CoordinateSpace:
         return self.monitors[0] if self.monitors else None
 
     # --- окна -------------------------------------------------------------
+
+    def window_rect_raw(self, hwnd: int) -> dict:
+        """Прямоугольник из `GetWindowRect`: включает невидимые поля тени DWM.
+
+        Оставлен для диагностики: разницу с видимой рамкой полезно видеть в журнале.
+        """
+        raw = wintypes.RECT()
+        if not self.user32.GetWindowRect(wintypes.HWND(hwnd), ctypes.byref(raw)):
+            raise OSError(f"GetWindowRect failed for hwnd={hwnd}")
+        return {"left": raw.left, "top": raw.top, "right": raw.right, "bottom": raw.bottom}
 
     def window_frame(self, hwnd: int) -> dict:
         """Прямоугольник ВИДИМОЙ рамки окна в физических пикселях.

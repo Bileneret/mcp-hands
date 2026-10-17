@@ -31,6 +31,8 @@ WINEVENT_SKIPOWNPROCESS = 0x0002
 WM_QUIT = 0x0012
 PM_REMOVE = 0x0001
 FILE_NOTIFY_CHANGE_FILE_NAME = 0x00000001
+FILE_NOTIFY_CHANGE_SIZE = 0x00000008
+FILE_NOTIFY_CHANGE_LAST_WRITE = 0x00000010
 FILE_LIST_DIRECTORY = 0x0001
 FILE_SHARE_ALL = 0x00000007
 OPEN_EXISTING = 3
@@ -243,9 +245,14 @@ class FileWatcher:
         buffer = ctypes.create_string_buffer(4096)
         returned = wintypes.DWORD(0)
         while not self._stop.is_set():
+            # Одного FILE_NOTIFY_CHANGE_FILE_NAME мало: он срабатывает на создание,
+            # удаление и переименование, но не на перезапись содержимого. Сохранение
+            # отчёта поверх существующего файла приходит как изменение размера и записи.
             if kernel32.ReadDirectoryChangesW(self._handle, buffer, ctypes.sizeof(buffer), False,
-                                              FILE_NOTIFY_CHANGE_FILE_NAME, ctypes.byref(returned),
-                                              None, None) and returned.value:
+                                              FILE_NOTIFY_CHANGE_FILE_NAME
+                                              | FILE_NOTIFY_CHANGE_SIZE
+                                              | FILE_NOTIFY_CHANGE_LAST_WRITE,
+                                              ctypes.byref(returned), None, None) and returned.value:
                 names = _parse_file_notifications(buffer.raw[: returned.value])
                 for name in names:
                     self._result.put(name)

@@ -13,6 +13,11 @@ def grabber():
     return ScreenGrabber()
 
 
+@pytest.fixture(autouse=True)
+def _needs_capture(require_capture):
+    """Без рабочего захвата эти проверки бессмысленны — пропускаем с причиной."""
+
+
 def test_grab_returns_frame(grabber):
     """Кадр приходит, имеет разумный размер и происходит из известного источника."""
     frame = grabber.grab()
@@ -44,9 +49,13 @@ def test_crop_uses_window_frame(target):
 
 
 def test_crop_rejects_empty_area(grabber):
+    """Пустая область — типизированный отказ с объяснением, а не голое ValueError."""
+    from mcp_hands.screen import ScreenCaptureError
+
     grabber.grab()
-    with pytest.raises(ValueError):
+    with pytest.raises(ScreenCaptureError) as error:
         grabber.crop({"left": 10, "top": 10, "right": 10, "bottom": 10})
+    assert "вне захваченного кадра" in str(error.value)
 
 
 def test_frame_converts_to_rgb_image(grabber):
