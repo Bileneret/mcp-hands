@@ -25,6 +25,9 @@ class Worker:
 
     def __init__(self, pid_file: str = "") -> None:
         self.awareness = _enable_dpi()
+        self._word = None
+        self._word_version = ""
+        self._word_process_id = 0
         # Строго до UIA и COM: comtypes создаёт скрытые окна для маршалинга, а поток
         # с окнами переключить рабочий стол уже нельзя (SetThreadDesktop вернёт 170).
         from .input import Actuator
@@ -85,6 +88,178 @@ class Worker:
         на рабочий стол ввода выполняется до создания окон и COM-объектов.
         """
         return self._desktop_info
+
+    # --- Word через COM ---------------------------------------------------
+    #
+    # Все вызовы идут в этом процессе, поэтому его можно убить по бюджету. Word
+    # поднимает служба DCOM: он не ребёнок воркера, и его pid регистрируется в файле
+    # реестра сразу после запуска — до первой блокирующей операции.
+
+    def _prepare_com(self) -> None:
+        """Готовит поток к COM и глушит системные окна ошибок.
+
+        `SetErrorMode` убирает диалоги «критическая ошибка приложения» и «отладка»:
+        без него сбой внутри COM-сервера поднимает модальное окно, которое никто
+        не закроет, и поток остаётся заблокированным навсегда.
+        """
+        import ctypes
+
+        ctypes.windll.kernel32.SetErrorMode(0x0001 | 0x0002)  # FAILCRITICALERRORS | NOGPFAULTERRORBOX
+        import pythoncom
+
+        pythoncom.CoInitialize()
+
+    @property
+    def word(self):
+        if self._word is None:
+            raise RuntimeError("Word не запущен: сначала вызовите word_start")
+        return self._word
+
+    @staticmethod
+    def _winword_pids() -> set:
+        """Список процессов WINWORD.EXE.
+
+        `Application.Hwnd` при позднем связывании может быть недоступно, поэтому pid
+        определяется сравнением списка процессов до и после запуска: `DispatchEx`
+        создаёт НОВЫЙ экземпляр Word, и разница — это он.
+        """
+        import ctypes
+        import ctypes.wintypes as wintypes
+
+        psapi = ctypes.WinDLL("psapi", use_last_error=True)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        psapi.EnumProcesses.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD,
+                                        ctypes.POINTER(wintypes.DWORD)]
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD,
+                                                        wintypes.LPWSTR,
+                                                        ctypes.POINTER(wintypes.DWORD)]
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+
+        capacity = 2048
+        buffer = (wintypes.DWORD * capacity)()
+        needed = wintypes.DWORD(0)
+        if not psapi.EnumProcesses(buffer, ctypes.sizeof(buffer), ctypes.byref(needed)):
+            return set()
+        found = set()
+        for index in range(needed.value // ctypes.sizeof(wintypes.DWORD)):
+            pid = int(buffer[index])
+            if not pid:
+                continue
+            handle = kernel32.OpenProcess(0x1000, False, pid)
+            if not handle:
+                continue
+            try:
+                name = ctypes.create_unicode_buffer(1024)
+                size = wintypes.DWORD(len(name))
+                if kernel32.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(size)):
+                    if name.value.rsplit("\\", 1)[-1].upper() == "WINWORD.EXE":
+                        found.add(pid)
+            finally:
+                kernel32.CloseHandle(handle)
+        return found
+
+    def op_word_start(self, visible: bool = False) -> dict:
+        """Поднимает Word: без предупреждений, невидимым, и сообщает свой pid."""
+        import win32com.client
+
+        self._prepare_com()
+        if self._word is not None:
+            return {"pid": self._word_pid(), "reused": True}
+        before = self._winword_pids()
+        application = win32com.client.DispatchEx("Word.Application")
+        application.Visible = bool(visible)
+        # Предупреждения выключены до любой работы с документами: иначе «Сохранить
+        # изменения?» или «Формат будет потерян» встаёт модальным окном.
+        application.DisplayAlerts = 0
+        self._word = application
+        self._word_version = str(application.Version)
+        new_pids = sorted(self._winword_pids() - before)
+        self._word_process_id = new_pids[0] if len(new_pids) == 1 else self._word_pid()
+        registered = self.op_register_process(pid=self._word_pid(), image="WINWORD.EXE",
+                                              note=f"Word {self._word_version} через COM")
+        return {"pid": self._word_pid(), "version": self._word_version,
+                "registry": registered, "new_processes": new_pids}
+
+    def _word_pid(self) -> int:
+        """PID нашего экземпляра Word, определённый при запуске."""
+        return int(getattr(self, "_word_process_id", 0) or 0)
+
+    def op_word_status(self) -> dict:
+        if self._word is None:
+            return {"running": False}
+        documents = []
+        try:
+            count = int(self._word.Documents.Count)
+            documents = [str(self._word.Documents(i + 1).Name) for i in range(count)]
+        except Exception as exc:  # noqa: BLE001 — состояние может быть недоступно
+            return {"running": True, "pid": self._word_pid(), "error": str(exc)}
+        return {"running": True, "pid": self._word_pid(), "version": self._word_version,
+                "documents": documents}
+
+    def op_word_new_document(self, text: str = "") -> dict:
+        document = self.word.Documents.Add()
+        if text:
+            document.Content.Text = text
+        return {"name": str(document.Name), "characters": int(document.Content.Characters.Count)}
+
+    def op_word_open(self, path: str) -> dict:
+        """Открывает документ. Здесь чаще всего появляются модальные окна Word."""
+        document = self.word.Documents.Open(path, ConfirmConversions=False, ReadOnly=False,
+                                            AddToRecentFiles=False, Visible=False)
+        return {"name": str(document.Name), "path": str(document.FullName),
+                "paragraphs": int(document.Paragraphs.Count)}
+
+    def op_word_replace(self, mapping: dict, match_case: bool = False) -> dict:
+        """Заменяет плейсхолдеры и подтверждает результат состоянием документа.
+
+        Параметры `Find.Execute` передаются ПОЗИЦИОННО: при позднем связывании
+        именованные аргументы приводят к тому, что вызов сообщает «найдено»,
+        но замену не выполняет (проверено на живом Word). И главное: код возврата
+        здесь ничего не доказывает — истина в том, остались ли плейсхолдеры в тексте.
+        """
+        document = self.word.ActiveDocument
+        for placeholder, value in mapping.items():
+            find = document.Content.Find
+            find.ClearFormatting()
+            find.Replacement.ClearFormatting()
+            # FindText, MatchCase, MatchWholeWord, MatchWildcards, MatchSoundsLike,
+            # MatchAllWordForms, Forward, Wrap (1 = wdFindContinue), Format,
+            # ReplaceWith, Replace (2 = wdReplaceAll)
+            find.Execute(str(placeholder), bool(match_case), False, False, False, False,
+                         True, 1, False, str(value), 2)
+        text = str(document.Content.Text)
+        remaining = [str(placeholder) for placeholder in mapping if str(placeholder) in text]
+        return {"remaining": remaining, "replaced_all": not remaining,
+                "characters": int(document.Content.Characters.Count)}
+
+    def op_word_save_as(self, path: str, as_pdf: bool = False) -> dict:
+        document = self.word.ActiveDocument
+        if as_pdf:
+            # 17 = wdFormatPDF. Экспорт печатает документ, поэтому Word занят и может
+            # ответить «сервер занят» — вызывающий обязан повторить (см. office.py).
+            document.ExportAsFixedFormat(OutputFileName=path, ExportFormat=17,
+                                         OpenAfterExport=False, OptimizeFor=0)
+        else:
+            document.SaveAs2(path)
+        import os
+
+        return {"path": str(path), "exists": os.path.exists(path),
+                "bytes": os.path.getsize(path) if os.path.exists(path) else 0}
+
+    def op_word_quit(self, save: bool = False) -> dict:
+        """Закрывает Word и снимает pid с учёта."""
+        if self._word is None:
+            return {"closed": True, "already": True}
+        pid = self._word_pid()
+        try:
+            self._word.Quit(0 if not save else -1)  # 0 = wdDoNotSaveChanges
+        finally:
+            self._word = None
+        if pid:
+            self.op_unregister_process(pid=pid)
+        return {"closed": True, "pid": pid}
 
     def op_unregister_process(self, pid: int) -> dict:
         """Убирает процесс из файла-реестра при штатном завершении.

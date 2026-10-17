@@ -152,3 +152,38 @@ def hang_target():
         yield fixture
     finally:
         fixture.close()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def office_janitor():
+    """Не даёт тестам оставить за собой процессы Office.
+
+    COM-сервер Word поднимает служба DCOM: он не ребёнок тестового процесса, и обычная
+    уборка его не задевает. Процессы, появившиеся за время прогона, снимаются в конце —
+    иначе следующий запуск получит висящий WINWORD.EXE с занятыми файлами.
+    """
+    import subprocess
+    import sys
+    import time
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from mcp_hands.probe_worker import Worker
+
+    def winword_pids() -> set:
+        try:
+            return Worker._winword_pids()
+        except Exception:  # noqa: BLE001 — уборка не должна ломать прогон
+            return set()
+
+    before = winword_pids()
+    yield
+    leaked = winword_pids() - before
+    for pid in leaked:
+        try:
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, timeout=10)
+        except Exception:  # noqa: BLE001
+            pass
+    if leaked:
+        time.sleep(0.5)
+        remaining = winword_pids() - before
+        assert not remaining, f"после прогона остались процессы Word: {sorted(remaining)}"
