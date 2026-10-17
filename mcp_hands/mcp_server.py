@@ -452,13 +452,20 @@ def _dry_run_click_checks(hwnd: int, node: dict) -> dict:
 
 def _run_domain(tool: str, module_name: str) -> ToolResult:
     started = time.perf_counter()
+    # Сценарии касаются COM (UiaClient и Office) прямо в setup, до первого шага:
+    # без инициализации в потоке инструмента первый же COM-вызов падает с
+    # CO_E_NOTINITIALIZED (поймано живым прогоном через хост, аудит v13).
+    _ensure_com()
     try:
         from importlib import import_module
 
         from .scenarios.runner import run_scenario
 
         module = import_module(f".scenarios.{module_name}", __package__)
-        summary = run_scenario(module.scenario, repeats=1, verbose=False)
+        # Имя прогона явное: __name__ у всех сценариев «scenario», и без него
+        # отчёты трёх доменов сваливаются в общий каталог.
+        summary = run_scenario(module.scenario, repeats=1, name=module_name,
+                               verbose=False)
     except Exception as exc:  # noqa: BLE001
         return _fail(tool, started, f"{type(exc).__name__}: {exc}")
     detail = {

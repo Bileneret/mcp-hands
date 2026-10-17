@@ -321,12 +321,23 @@ def scenario(run: Run, workdir: Path) -> None:
         result = close_tab(uia, actuator, hwnd, marker)
         names = all_tabs(uia)
         user_after = sorted(base_name(name) for name in names if not name.startswith(TAB_PREFIX))
-        users_ok = user_after == user_tabs_before
-        step.details.update({"close": result, "tabs_after": names, "user_tabs_after": user_after})
-        run.confirm(f"вкладка закрыта: {result['gone']}; осталось вкладок {len(names)}; "
-                    f"пользовательские целы: {users_ok}", ok=result["gone"] and users_ok)
+        # Постусловие защиты — «ни одна пользовательская вкладка не исчезла»:
+        # наш Ctrl+W механически не может попасть в чужую вкладку (только при
+        # подтверждённом заголовке с именем нашего файла). Появление чужих —
+        # восстановление сессии Блокнота (живой факт: 4 → 12 между замерами,
+        # аудит v10 и живой сеанс этапа 2): не вмешательство, фиксируем отдельно.
+        disappeared = sorted(set(user_tabs_before) - set(user_after))
+        appeared = sorted(set(user_after) - set(user_tabs_before))
+        users_ok = not disappeared
+        step.details.update({"close": result, "tabs_after": names,
+                             "user_tabs_after": user_after,
+                             "user_disappeared": disappeared, "user_appeared": appeared})
+        run.confirm(f"вкладка закрыта: {result['gone']}; пользовательские: "
+                    f"исчезли {len(disappeared)}, появились средой {len(appeared)}",
+                    ok=result["gone"] and users_ok)
         if not result["gone"] or not users_ok:
-            step.error = result.get("reason", "постусловие закрытия не выполнено")
+            step.error = result.get("reason", "") or \
+                f"исчезли пользовательские вкладки: {disappeared}"
         if process is not None:
             try:
                 process.wait(timeout=2)  # процесс НЕ убиваем: в нём могут быть чужие вкладки

@@ -215,7 +215,6 @@ def test_dry_run_never_touches_actuator():
     """dry_run в hotkey/type_text не трогает клавиатурный путь актуатора вовсе;
     предварительно мишень назначается активной подделкой стража."""
     calls: list[str] = []
-
     class FakeActuator:
         def guard_keyboard(self, expect_hwnd, allow_any_window=False):
             calls.append("guard")
@@ -267,3 +266,41 @@ def test_dry_run_never_touches_actuator():
         assert "guard" in calls, "страж должен был проверяться"
     finally:
         ms._actuator = None
+
+
+def test_domain_path_initializes_com_in_host_threads():
+    """Регрессия живого прогона (аудит v13): хост исполняет синхронные инструменты
+    в рабочих потоках, где COM может быть не инициализирован — `notepad_run` падал
+    с CO_E_NOTINITIALIZED до первого шага, потому что сценарный путь не проходил
+    через `_automation()`. Инвариант: после `_ensure_com()` создание UIA-клиента
+    в свежем потоке гарантировано (повторный CoInitialize безвреден). Негатив
+    «голый поток обязан упасть» НЕ утверждаем: инициализация свежего потока
+    средозависима (на живом хосте падало, в тест-процессе не всегда)."""
+    import threading
+
+    outcome: dict = {}
+
+    def ensured_com_works() -> None:
+        ms._ensure_com()
+        from mcp_hands.uia import UiaClient
+
+        try:
+            UiaClient()
+        except OSError as exc:
+            outcome["ensured"] = exc
+        else:
+            outcome["ensured"] = None
+
+    thread = threading.Thread(target=ensured_com_works)
+    thread.start()
+    thread.join(30)
+    assert outcome["ensured"] is None, outcome["ensured"]
+
+
+def test_run_domain_source_calls_ensure_com():
+    """Страховка «одна строка»: `_run_domain` обязан инициировать COM до сценария —
+    иначе доменные инструменты падают на рабочих потоках хоста (живой инцидент v13)."""
+    import inspect
+
+    source = inspect.getsource(ms._run_domain)
+    assert "_ensure_com()" in source, source
