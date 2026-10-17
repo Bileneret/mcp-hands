@@ -109,15 +109,23 @@ def test_type_text_keeps_cyrillic_intact():
 # --- P0-4: курсор недоступен --------------------------------------------------------
 
 
-def test_click_proceeds_when_cursor_is_unavailable():
-    """`GetCursorPos` == (0,0) в неинтерактивной сессии не должен отменять нажатие."""
+def test_click_is_blocked_when_cursor_position_unknown():
+    """Недоступная позиция курсора — причина ОТКАЗАТЬ в нажатии, а не нажать вслепую.
+
+    Первая версия правки (по отчёту 09) выполняла клик с пометкой. Аудит v2 показал,
+    почему это опасно: нажатие без подтверждённой позиции уходит в текущую точку
+    курсора, где может быть кнопка закрытия или отправки. Теперь по умолчанию — отказ,
+    а обход только явным `allow_unverified=True` (проверяется отдельным тестом в
+    `test_regressions_audit_v2.py`).
+    """
     actuator = Actuator()
     actuator.cursor = lambda: (0, 0)  # курсор система не отдаёт
     with Capture(actuator) as capture:
         result = actuator.click(500, 500, verify=True, settle_s=0)
     presses = [event for event in capture.events if event["flags"] & MOUSEEVENTF_LEFTDOWN]
-    assert result["ok"] and presses, f"нажатие отменено: {result}"
+    assert not result["ok"] and not presses, f"слепой клик прошёл: {result}"
     assert result["cursor_check"] == "недоступен"
+    assert "слепой клик заблокирован" in result["reason"]
 
 
 def test_click_still_blocked_on_real_mismatch():

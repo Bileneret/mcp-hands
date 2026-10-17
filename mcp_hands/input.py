@@ -177,6 +177,63 @@ class Actuator:
 
     # --- низкий уровень ---------------------------------------------------
 
+    def attach_to_input_desktop(self) -> dict:
+        """Привязывает поток к рабочему столу ввода.
+
+        Если процесс запущен не в интерактивном рабочем столе (служба, задача планировщика,
+        часть окружений IDE), `SendInput` завершается с `ERROR_ACCESS_DENIED`, а
+        `GetCursorPos` возвращает (0,0). Переключение потока на рабочий стол ввода
+        возвращает обоим функциям работоспособность.
+
+        Вызывать до создания окон и хуков: `SetThreadDesktop` отказывается работать
+        у потока, который уже что-то создал.
+        """
+        user32 = self.user32
+        user32.OpenInputDesktop.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        user32.OpenInputDesktop.restype = wintypes.HANDLE
+        user32.SetThreadDesktop.argtypes = [wintypes.HANDLE]
+        user32.SetThreadDesktop.restype = wintypes.BOOL
+        user32.GetUserObjectInformationW.argtypes = [wintypes.HANDLE, ctypes.c_int,
+                                                     ctypes.c_void_p, wintypes.DWORD,
+                                                     ctypes.POINTER(wintypes.DWORD)]
+        user32.GetThreadDesktop.argtypes = [wintypes.DWORD]
+        user32.GetThreadDesktop.restype = wintypes.HANDLE
+        user32.CloseDesktop.argtypes = [wintypes.HANDLE]
+
+        desktop = user32.OpenInputDesktop(0, False, 0x01FF)  # DESKTOP_ALL_ACCESS
+        if not desktop:
+            self.desktop = {"attached": False, "name": None,
+                            "reason": f"OpenInputDesktop: {ctypes.get_last_error()}"}
+            return self.desktop
+        input_name = self._desktop_name(desktop)
+        current = user32.GetThreadDesktop(self.kernel32.GetCurrentThreadId())
+        current_name = self._desktop_name(current) if current else None
+
+        # Переключаться нужно только если рабочие столы РАЗНЫЕ. Если поток уже на столе
+        # ввода (обычный случай для интерактивной сессии), вызов SetThreadDesktop вернёт
+        # ошибку 170 — поток успел создать скрытое окно (их создаёт comtypes для
+        # маршалинга COM), и это не признак нерабочего ввода.
+        if current_name and current_name == input_name:
+            self.desktop = {"attached": True, "name": input_name, "how": "уже на столе ввода",
+                            "reason": None}
+            return self.desktop
+        attached = bool(user32.SetThreadDesktop(desktop))
+        self.desktop = {"attached": attached, "name": input_name,
+                        "how": "переключён" if attached else "не удалось",
+                        "thread_desktop": current_name,
+                        "reason": None if attached else
+                                  f"SetThreadDesktop: {ctypes.get_last_error()} "
+                                  f"(170 — у потока уже есть окна или хуки)"}
+        return self.desktop
+
+    @staticmethod
+    def _desktop_name(handle) -> str:
+        buffer = ctypes.create_unicode_buffer(256)
+        needed = ctypes.wintypes.DWORD(0)
+        ok = ctypes.WinDLL("user32", use_last_error=True).GetUserObjectInformationW(
+            handle, 2, buffer, ctypes.sizeof(buffer), ctypes.byref(needed))  # UIO_NAME
+        return buffer.value if ok else f"<ошибка {ctypes.get_last_error()}>"
+
     def _send(self, *spec) -> int:
         """Отправляет события ввода.
 
@@ -252,13 +309,17 @@ class Actuator:
         self._send((INPUT_MOUSE, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, *self.space.to_normalized(x, y), 0))
 
     def click(self, x: int, y: int, verify: bool = True, tolerance: int = 4,
-              settle_s: float = 0.05) -> dict:
+              settle_s: float = 0.05, allow_unverified: bool = False) -> dict:
         """Перемещение, проверка позиции курсора, нажатие.
 
-        Проверка курсора — страховка от промаха при смешении координатных пространств,
-        но она не должна блокировать ввод там, где система вообще не отдаёт позицию:
-        `GetCursorPos` возвращает (0,0) в неинтерактивной сессии. Тогда нажатие
-        выполняется, а результат помечается `cursor_check: "недоступен"`.
+        Нажатие отправляется С абсолютными координатами цели: даже если перемещение
+        не отработало, система поставит курсор в нужную точку в момент щелчка.
+        Иначе нажатие ушло бы в текущую позицию курсора, где может оказаться
+        что угодно — например, кнопка закрытия чужого окна.
+
+        Если позицию курсора подтвердить нельзя (неинтерактивный рабочий стол),
+        нажатие блокируется: слепой клик в неизвестное место недопустим. Осознанный
+        обход — только явным аргументом `allow_unverified=True`.
         """
         self.move(x, y)
         if settle_s:
@@ -270,18 +331,37 @@ class Actuator:
             time.sleep(settle_s)
             landed = self.cursor()
             cursor_available = not (landed == (0, 0) and (x, y) != (0, 0))
+        if verify and not cursor_available and not allow_unverified:
+            return {"ok": False, "target": [x, y], "landed": list(landed),
+                    "cursor_check": "недоступен", "events": 0,
+                    "reason": "позиция курсора не подтверждена — слепой клик заблокирован "
+                              "(обход: allow_unverified=True)"}
         if verify and cursor_available and (
                 abs(landed[0] - x) > tolerance or abs(landed[1] - y) > tolerance):
             return {"ok": False, "target": [x, y], "landed": list(landed),
-                    "cursor_check": "промах",
+                    "cursor_check": "промах", "events": 0,
                     "reason": "курсор не встал на цель — нажатие отменено"}
-        sent = self._send((INPUT_MOUSE, MOUSEEVENTF_LEFTDOWN, 0, 0, 0),
-                          (INPUT_MOUSE, MOUSEEVENTF_LEFTUP, 0, 0, 0))
-        return {"ok": sent == 2, "target": [x, y], "landed": list(landed), "events": sent,
-                "cursor_check": "проверен" if cursor_available else "недоступен"}
+        normalized = self.space.to_normalized(x, y)
+        # У нажатия и отпускания флаги СВОИ: событие с одновременными LEFTDOWN и LEFTUP
+        # система трактует непредсказуемо, а координаты цели нужны обоим.
+        sent = self._send((INPUT_MOUSE, MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_ABSOLUTE, *normalized, 0),
+                          (INPUT_MOUSE, MOUSEEVENTF_LEFTUP | MOUSEEVENTF_ABSOLUTE, *normalized, 0))
+        result = {"ok": sent == 2, "target": [x, y], "landed": list(landed), "events": sent,
+                  "cursor_check": "проверен" if cursor_available else "недоступен"}
+        if sent != 2:
+            result["reason"] = (f"SendInput отправил {sent} из 2 событий: "
+                                f"WinError {ctypes.get_last_error()} "
+                                f"(5 — доступ запрещён: изоляция рабочего стола или UIPI)")
+        return result
 
-    def click_node(self, node: dict, pid: int = 0, activate: bool = True) -> dict:
-        """Клик по элементу: активация окна, при необходимости проверка UIPI, клик."""
+    def click_node(self, node: dict, pid: int = 0, activate: bool = True,
+                   window_hwnd: int = 0) -> dict:
+        """Клик по элементу: активация окна, проверка UIPI, клик.
+
+        Окно поднимается ВСЕГДА, когда известен его дескриптор: элемент из UIA не несёт
+        `hwnd` (это свойство окна, а не кнопки), и без явной активации клик уходит
+        в перекрывающее окно — например, в консоль поверх мишени.
+        """
         rect = node.get("rect")
         if not rect:
             return {"ok": False, "reason": "у элемента нет прямоугольника"}
@@ -294,8 +374,9 @@ class Actuator:
             if rights["blocked_by_uipi"]:
                 return {**result, "ok": False,
                         "reason": "целевое окно запущено с более высокими правами: ввод не дойдёт"}
-        if activate and node.get("hwnd"):
-            result["activation"] = self.activate(node["hwnd"])
+        target_hwnd = window_hwnd or node.get("hwnd") or 0
+        if activate and target_hwnd:
+            result["activation"] = self.activate(target_hwnd)
         result.update(self.click(*center))
         return result
 

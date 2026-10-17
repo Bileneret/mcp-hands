@@ -171,11 +171,28 @@ class ScreenGrabber:
 
     @staticmethod
     def covers(frame: Frame, rect: dict) -> bool:
-        """Полностью ли попадает область в кадр: проверка перед кропом."""
+        """Видна ли область ЦЕЛИКОМ: строгая проверка, нужна для диагностики."""
         offset_x, offset_y = frame.origin
         height, width = frame.image.shape[0], frame.image.shape[1]
         return (rect["left"] >= offset_x and rect["top"] >= offset_y
                 and rect["right"] <= offset_x + width and rect["bottom"] <= offset_y + height)
+
+    @staticmethod
+    def intersects(frame: Frame, rect: dict) -> bool:
+        """Есть ли у области хоть какая-то видимая часть.
+
+        Именно эта проверка решает, годится ли кадр для кропа: у развёрнутого окна
+        рамка может выходить за пределы экрана (невидимые поля изменения размера),
+        и требование полного включения запрещало бы снимать любое максимизированное окно.
+        На экране видно только то, что поместилось, — остальное обрезает `crop`.
+        """
+        offset_x, offset_y = frame.origin
+        height, width = frame.image.shape[0], frame.image.shape[1]
+        inter_left = max(offset_x, rect["left"])
+        inter_top = max(offset_y, rect["top"])
+        inter_right = min(offset_x + width, rect["right"])
+        inter_bottom = min(offset_y + height, rect["bottom"])
+        return inter_right > inter_left and inter_bottom > inter_top
 
     def crop_window(self, space, hwnd: int, frame: Frame | None = None) -> Frame:
         """Кроп окна с автоподбором пути захвата под его монитор.
@@ -186,13 +203,16 @@ class ScreenGrabber:
         """
         rect = space.window_frame(hwnd)
         base = frame or self._last
-        if base is None or not self.covers(base, rect):
+        if base is None or not self.intersects(base, rect):
             base = self.grab(prefer="mss")
-            if not self.covers(base, rect):
+            if not self.intersects(base, rect):
                 raise ScreenCaptureError(
                     f"окно {rect} не попало даже в кадр всего виртуального экрана "
                     f"(начало {base.origin}, размер {base.size})")
-        return self.crop(rect, base)
+        crop = self.crop(rect, base)
+        if not self.covers(base, rect):
+            crop.suspicious.append("окно видно не целиком: рамка выходит за пределы кадра")
+        return crop
 
     def retry_dxgi(self) -> None:
         """Сбрасывает пометку отказа: вызывается после пробуждения дисплея."""

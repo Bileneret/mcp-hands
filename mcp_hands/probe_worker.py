@@ -23,8 +23,14 @@ def _enable_dpi() -> str:
 class Worker:
     """Состояние сателлита: клиент UIA, актуатор и координатное пространство создаются один раз."""
 
-    def __init__(self) -> None:
+    def __init__(self, pid_file: str = "") -> None:
         self.awareness = _enable_dpi()
+        # Строго до UIA и COM: comtypes создаёт скрытые окна для маршалинга, а поток
+        # с окнами переключить рабочий стол уже нельзя (SetThreadDesktop вернёт 170).
+        from .input import Actuator
+
+        self._desktop_info = Actuator().attach_to_input_desktop()
+        self.pid_file = pid_file
         self._uia = None
         self._actuator = None
         self._space = None
@@ -68,7 +74,38 @@ class Worker:
         from . import __version__
 
         return {"version": __version__, "awareness": self.awareness,
+                "desktop": self._desktop(),
                 "pid": ctypes.windll.kernel32.GetCurrentProcessId()}
+
+    def _desktop(self) -> dict:
+        """Рабочий стол ввода: без него ввод в чужие окна не доходит.
+
+        Процесс, запущенный вне интерактивного рабочего стола, получает от SendInput
+        ERROR_ACCESS_DENIED, а GetCursorPos возвращает (0,0). Переключение потока
+        на рабочий стол ввода выполняется до создания окон и COM-объектов.
+        """
+        return self._desktop_info
+
+    def op_register_process(self, pid: int, image: str = "", note: str = "") -> dict:
+        """Записывает процесс в файл-реестр: супервизор подберёт его при аварийном снятии.
+
+        Вызывается сразу после запуска внешнего процесса (COM-сервера) и ДО блокирующего
+        вызова: если воркер зависнет внутри COM, ответа родителю не будет, а запись
+        в файле останется.
+        """
+        import json
+
+        if not self.pid_file:
+            return {"ok": False, "reason": "файл-реестр не задан"}
+        path = __import__("pathlib").Path(self.pid_file)
+        entries = []
+        if path.exists():
+            with __import__("contextlib").suppress(ValueError, OSError):
+                entries = json.loads(path.read_text(encoding="utf-8")) or []
+        entries = [entry for entry in entries if int(entry.get("pid", 0)) != pid]
+        entries.append({"pid": pid, "image": image, "note": note})
+        path.write_text(json.dumps(entries, ensure_ascii=False), encoding="utf-8")
+        return {"ok": True, "registered": pid, "total": len(entries)}
 
     def op_windows(self, title_contains: str = "", exe: str = "") -> list[dict]:
         from . import uia
@@ -112,7 +149,8 @@ class Worker:
             landed = self.actuator.cursor()
             return {"ok": True, "moved_only": True, "center": center, "landed": list(landed)}
         window = next((w for w in self.op_windows() if w["hwnd"] == hwnd), None)
-        return self.actuator.click_node(node, pid=window["pid"] if window else 0)
+        return self.actuator.click_node(node, pid=window["pid"] if window else 0,
+                                        window_hwnd=hwnd)
 
     def op_type(self, text: str) -> dict:
         return self.actuator.type_text(text)
@@ -139,9 +177,9 @@ class Worker:
                 "has_uia": self._uia is not None, "has_actuator": self._actuator is not None}
 
 
-def main(connection) -> None:
+def main(connection, pid_file: str = "") -> None:
     """Цикл сателлита: читаем запрос, отвечаем, ждём следующий."""
-    worker = Worker()
+    worker = Worker(pid_file=pid_file)
     try:
         while True:
             try:

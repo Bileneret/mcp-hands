@@ -53,7 +53,14 @@ class ProbeError(RuntimeError):
 class ProbeProcess:
     """Постоянный процесс-исполнитель с бюджетом на вызов."""
 
-    def __init__(self, default_timeout_s: float = 1.0, name: str = "mcp-hands-probe") -> None:
+    def __init__(self, default_timeout_s: float = 1.0, name: str = "mcp-hands-probe",
+                 pid_file: "Path | None" = None) -> None:
+        import tempfile
+        from pathlib import Path as _Path
+
+        self.pid_file = _Path(pid_file) if pid_file else \
+            _Path(tempfile.gettempdir()) / f"{name}.pids.json"
+        self.pid_file.unlink(missing_ok=True)
         self.default_timeout_s = default_timeout_s
         self.name = name
         self.stats = ProbeStats()
@@ -73,13 +80,16 @@ class ProbeProcess:
 
         parent, child = multiprocessing.Pipe()
         self._connection = parent
-        self._process = multiprocessing.Process(target=probe_worker.main, args=(child,),
+        self._process = multiprocessing.Process(target=probe_worker.main,
+                                                args=(child, str(self.pid_file)),
                                                 name=self.name, daemon=True)
         self._process.start()
         child.close()
 
     def stop(self) -> None:
+        self.sync_from_registry()
         self.kill_tracked()
+        self.pid_file.unlink(missing_ok=True)
         if self._connection is not None:
             try:
                 self._connection.send(None)  # вежливая просьба завершиться
@@ -99,44 +109,117 @@ class ProbeProcess:
 
     # --- отслеживаемые процессы ------------------------------------------
 
-    def track_process(self, pid: int, note: str = "") -> None:
+    def track_process(self, pid: int, note: str = "", image: str = "") -> None:
         """Берёт процесс под опеку: он будет убит вместе с сателлитом.
 
         Нужно для COM-серверов Office: их запускает служба DCOM, ребёнком воркера они
         не являются, и при снятии сателлита остаются висеть, блокируя документы.
+
+        `image` — ожидаемое имя исполняемого файла (например, `WINWORD.EXE`). Перед
+        убийством образ проверяется: Windows переиспользует идентификаторы процессов,
+        и убивать по одному лишь номеру опасно.
         """
         if pid and pid > 0:
-            self._tracked[pid] = note
+            self._tracked[pid] = {"note": note, "image": image}
 
     def untrack_process(self, pid: int) -> None:
         self._tracked.pop(pid, None)
 
     def tracked_processes(self) -> list[dict]:
-        return [{"pid": pid, "note": note} for pid, note in self._tracked.items()]
+        return [{"pid": pid, **info} for pid, info in self._tracked.items()]
 
-    def kill_tracked(self) -> list[int]:
-        """Принудительно завершает опекаемые процессы и возвращает список убитых."""
+    @staticmethod
+    def process_image_name(pid: int) -> str:
+        """Имя исполняемого файла процесса: защита от убийства по переиспользованному PID."""
+        import ctypes
+        import ctypes.wintypes as wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        kernel32.OpenProcess.restype = wintypes.HANDLE
+        kernel32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD,
+                                                        wintypes.LPWSTR,
+                                                        ctypes.POINTER(wintypes.DWORD)]
+        kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+        handle = kernel32.OpenProcess(0x1000, False, pid)  # QUERY_LIMITED_INFORMATION
+        if not handle:
+            return ""
+        try:
+            buffer = ctypes.create_unicode_buffer(1024)
+            size = wintypes.DWORD(len(buffer))
+            if kernel32.QueryFullProcessImageNameW(handle, 0, buffer, ctypes.byref(size)):
+                return buffer.value.rsplit("\\", 1)[-1]
+        finally:
+            kernel32.CloseHandle(handle)
+        return ""
+
+    def kill_tracked(self) -> list[dict]:
+        """Завершает опекаемые процессы; возвращает отчёт по каждому.
+
+        Перед убийством проверяется имя образа: если оно не совпадает с записанным,
+        процесс не наш — номер успел переиспользоваться, и трогать его нельзя.
+        """
         import subprocess
 
-        killed: list[int] = []
-        for pid, _note in list(self._tracked.items()):
-            try:
-                # text=False: taskkill отвечает в кодировке консоли, и декодирование
-                # как UTF-8 роняет поток чтения ещё до разбора результата.
-                completed = subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
-                                           capture_output=True, timeout=10)
-                if completed.returncode == 0:
-                    killed.append(pid)
-            except Exception:  # noqa: BLE001 — отсутствующий процесс это не ошибка
-                pass
+        report: list[dict] = []
+        for pid, info in list(self._tracked.items()):
+            image = info.get("image", "")
+            actual = self.process_image_name(pid)
+            if not actual:
+                report.append({"pid": pid, "killed": False, "reason": "процесса уже нет"})
+            elif image and actual.lower() != image.lower():
+                report.append({"pid": pid, "killed": False, "image": actual,
+                               "reason": f"образ не совпал с ожидаемым {image}: PID переиспользован"})
+            else:
+                try:
+                    # text=False: taskkill отвечает в кодировке консоли, и декодирование
+                    # как UTF-8 роняет поток чтения ещё до разбора результата.
+                    completed = subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                                               capture_output=True, timeout=10)
+                    report.append({"pid": pid, "killed": completed.returncode == 0,
+                                   "image": actual})
+                except Exception as exc:  # noqa: BLE001
+                    report.append({"pid": pid, "killed": False, "reason": str(exc)})
             self._tracked.pop(pid, None)
-        return killed
+        return report
+
+    # --- реестр процессов, созданных сателлитом ---------------------------
+
+    def register_external(self, pid: int, image: str = "", note: str = "") -> None:
+        """Регистрирует процесс, о котором сателлит сообщил через файл-реестр.
+
+        Нужно потому, что COM-сервер (Word) создаётся ВНУТРИ воркера. Если воркер
+        зависнет в блокирующем COM-вызове, он не успеет сообщить pid ответом на запрос,
+        и Word утечёт. Поэтому воркер пишет pid в файл сразу после запуска, а супервизор
+        читает файл в момент аварийного снятия — независимо от состояния воркера.
+        """
+        if pid and pid > 0 and pid not in self._tracked:
+            self._tracked[pid] = {"note": note or "из реестра сателлита", "image": image}
+
+    def sync_from_registry(self) -> list[dict]:
+        """Подбирает процессы, записанные сателлитом в файл-реестр."""
+        if not self.pid_file or not self.pid_file.exists():
+            return []
+        import json
+
+        try:
+            entries = json.loads(self.pid_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        added = []
+        for entry in entries if isinstance(entries, list) else []:
+            pid = int(entry.get("pid", 0))
+            if pid and pid not in self._tracked:
+                self.register_external(pid, entry.get("image", ""), entry.get("note", ""))
+                added.append(entry)
+        return added
 
     def kill(self) -> None:
         """Аварийное снятие: единственный способ разблокировать зависший вызов UIA."""
+        self.sync_from_registry()  # подбираем то, о чём сателлит успел записать
         tracked_killed = self.kill_tracked()
         if tracked_killed:
-            self.stats.history.append({"op": "kill_tracked", "killed": tracked_killed})
+            self.stats.history.append({"op": "kill_tracked", "processes": tracked_killed})
         if self._process is not None:
             self._process.kill()
             self._process.join(1.0)

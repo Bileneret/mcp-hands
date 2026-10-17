@@ -49,6 +49,14 @@ class Target:
                 self.ready = True
                 break
         time.sleep(0.6)  # окну нужно дорисоваться и попасть в дерево UIA
+        self.bring_to_front()
+
+    def bring_to_front(self) -> bool:
+        """Поднимает мишень: иначе её перекрывает постороннее окно и клик уходит не туда."""
+        from mcp_hands.geometry import CoordinateSpace
+        from mcp_hands.input import Actuator
+
+        return bool(Actuator(CoordinateSpace()).activate(self.hwnd).get("ok"))
 
     def clicks(self) -> list[str]:
         return [line for line in self.log_path.read_text(encoding="utf-8").splitlines()
@@ -95,9 +103,14 @@ def require_capture(capture_available: bool) -> None:
 
 @pytest.fixture
 def target():
-    """Окно-мишень с кнопками alpha, beta, gamma."""
+    """Окно-мишень с кнопками alpha, beta, gamma.
+
+    Перед каждым использованием поднимается наверх: в фоне могут появляться консольные
+    окна от тестовых команд, и они перехватывают клики и закрывают часть мишени.
+    """
     fixture = Target("mcp_hands.testing.fixture_window", "MCP-Hands pytest target")
     try:
+        fixture.bring_to_front()
         yield fixture
     finally:
         fixture.close()
