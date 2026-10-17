@@ -1,0 +1,405 @@
+{
+ "generated": "2026-10-17 04:19:27",
+ "depth": 3,
+ "jump": "auto",
+ "targets": {
+  "Notepad.exe": {
+   "cached": {
+    "mode": "cached",
+    "runs": 5,
+    "elements": 5,
+    "ms_min": 4.1,
+    "ms_median": 5.1,
+    "ms_max": 8.1,
+    "ms_per_element": 1.028,
+    "levels": [
+     {
+      "level": 1,
+      "parents": 1,
+      "elements": 1,
+      "ms": 4.8,
+      "ms_per_parent": 4.8
+     },
+     {
+      "level": 2,
+      "parents": 1,
+      "elements": 4,
+      "ms": 0.03,
+      "ms_per_parent": 0.03
+     },
+     {
+      "level": 3,
+      "parents": 4,
+      "elements": 0,
+      "ms": 0.01,
+      "ms_per_parent": 0.0
+     }
+    ],
+    "nodes_dumped": 5,
+    "sample_nodes": [
+     {
+      "name": "По вертикали",
+      "automation_id": "NonClientVerticalScrollBar",
+      "class_name": "",
+      "control_type": "UIA_ScrollBarControlTypeId",
+      "localized_type": "полоса прокрутки",
+      "rect": [
+       1792,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": 1
+     },
+     {
+      "name": "Строка вверх",
+      "automation_id": "UpButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       389,
+       1813,
+       410
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Положение",
+      "automation_id": "ScrollbarThumb",
+      "class_name": "",
+      "control_type": "UIA_ThumbControlTypeId",
+      "localized_type": "бегунок",
+      "rect": [
+       1792,
+       410,
+       1813,
+       431
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Прокрутить вниз",
+      "automation_id": "DownPageButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       431,
+       1813,
+       855
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     },
+     {
+      "name": "Строка вниз",
+      "automation_id": "DownButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       855,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": 2
+     }
+    ]
+   },
+   "propcost": {
+    "mode": "propcost",
+    "runs": 5,
+    "elements": 5,
+    "ms_min": 5.0,
+    "ms_median": 5.6,
+    "ms_max": 7.2,
+    "ms_per_element": 1.112,
+    "levels": [
+     {
+      "level": "cached_read",
+      "parents": 5,
+      "elements": 5,
+      "ms": 0.325,
+      "ms_per_parent": 0.0651,
+      "properties_per_element": 26
+     },
+     {
+      "level": "current_read",
+      "parents": 5,
+      "elements": 5,
+      "ms": 0.591,
+      "ms_per_parent": 0.1181,
+      "properties_per_element": 26
+     }
+    ],
+    "nodes_dumped": 10,
+    "sample_nodes": [
+     {
+      "name": "По вертикали",
+      "automation_id": "NonClientVerticalScrollBar",
+      "class_name": "",
+      "control_type": "UIA_ScrollBarControlTypeId",
+      "localized_type": "полоса прокрутки",
+      "rect": [
+       1792,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Строка вверх",
+      "automation_id": "UpButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       389,
+       1813,
+       410
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Положение",
+      "automation_id": "ScrollbarThumb",
+      "class_name": "",
+      "control_type": "UIA_ThumbControlTypeId",
+      "localized_type": "бегунок",
+      "rect": [
+       1792,
+       410,
+       1813,
+       431
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Прокрутить вниз",
+      "automation_id": "DownPageButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       431,
+       1813,
+       855
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "Строка вниз",
+      "automation_id": "DownButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       855,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "cached_read"
+     },
+     {
+      "name": "По вертикали",
+      "automation_id": "NonClientVerticalScrollBar",
+      "class_name": "",
+      "control_type": "UIA_ScrollBarControlTypeId",
+      "localized_type": "полоса прокрутки",
+      "rect": [
+       1792,
+       389,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "current_read"
+     },
+     {
+      "name": "Строка вверх",
+      "automation_id": "UpButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       389,
+       1813,
+       410
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "current_read"
+     },
+     {
+      "name": "Положение",
+      "automation_id": "ScrollbarThumb",
+      "class_name": "",
+      "control_type": "UIA_ThumbControlTypeId",
+      "localized_type": "бегунок",
+      "rect": [
+       1792,
+       410,
+       1813,
+       431
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "current_read"
+     },
+     {
+      "name": "Прокрутить вниз",
+      "automation_id": "DownPageButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       431,
+       1813,
+       855
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "current_read"
+     },
+     {
+      "name": "Строка вниз",
+      "automation_id": "DownButton",
+      "class_name": "",
+      "control_type": "UIA_ButtonControlTypeId",
+      "localized_type": "кнопка",
+      "rect": [
+       1792,
+       855,
+       1813,
+       876
+      ],
+      "offscreen": 0,
+      "enabled": 1,
+      "focusable": 0,
+      "focused": 0,
+      "password": 0,
+      "process_id": 25208,
+      "framework": "",
+      "hwnd": null,
+      "level": "current_read"
+     }
+    ]
+   }
+  }
+ },
+ "hang": null
+}

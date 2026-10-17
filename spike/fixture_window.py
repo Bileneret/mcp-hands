@@ -108,6 +108,12 @@ def wnd_proc(hwnd, message, wparam, lparam):
 
 def main() -> int:
     global _log_path
+    # Мишень обязана быть per-monitor aware: unaware-процесс Windows сама растягивает
+    # через DWM, и в тесте координат появляется лишний слой виртуализации.
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(2)
+    except OSError:
+        pass
     parser = argparse.ArgumentParser(description="Тестовое окно с тремя кнопками")
     parser.add_argument("--click-log", default=str(Path(__file__).resolve().parent / ".clicks.log"))
     parser.add_argument("--title", default="MCP-Hands CoordinateSpace fixture")

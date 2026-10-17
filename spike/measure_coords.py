@@ -39,6 +39,10 @@ CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 INPUT_MOUSE = 0
 MOUSEEVENTF_MOVE = 0x0001
 MOUSEEVENTF_ABSOLUTE = 0x8000
+# Без VIRTUALDESK абсолютные координаты проецируются ТОЛЬКО на первичный монитор:
+# на мультимониторной системе клик по второму экрану уйдёт на основной (проверить
+# на одном мониторе нельзя — правка внесена по спецификации Win32).
+MOUSEEVENTF_VIRTUALDESK = 0x4000
 MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
 BUTTONS = ("alpha", "beta", "gamma")
@@ -117,7 +121,12 @@ def element_rect(uia, hwnd: int, name: str) -> dict | None:
 
 
 def normalize(x: int, y: int, screen: dict) -> tuple[int, int]:
-    """Физические пиксели → 0..65535 по метрикам, которые видит САМ процесс."""
+    """Физические пиксели → 0..65535 по метрикам, которые видит САМ процесс.
+
+    Считается относительно левого верхнего угла виртуального экрана: на конфигурации
+    с монитором слева от основного (`SM_XVIRTUALSCREEN` < 0) без этого смещения клик
+    уходит за пределы нужного монитора.
+    """
     left, top, width, height = screen["virtual"]
     return (round((x - left) * 65535 / max(1, width - 1)),
             round((y - top) * 65535 / max(1, height - 1)))
@@ -130,6 +139,8 @@ def send_events(user32, *spec) -> int:
     events = (INPUT * len(spec))()
     for index, (flags, x, y) in enumerate(spec):
         events[index].type = INPUT_MOUSE
+        if flags & MOUSEEVENTF_ABSOLUTE:
+            flags |= MOUSEEVENTF_VIRTUALDESK
         events[index].mi = MOUSEINPUT(x, y, 0, flags, 0, None)
     return user32.SendInput(len(spec), events, ctypes.sizeof(INPUT))
 
@@ -195,8 +206,11 @@ def click_verified(user32, norm: tuple[int, int], tolerance: int = 4) -> dict:
     send_events(user32, (MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, *norm))
     time.sleep(0.05)
     landed = cursor_pos(user32)
-    screen = metrics(user32)["virtual"]
-    expected = (round(norm[0] * (screen[2] - 1) / 65535), round(norm[1] * (screen[3] - 1) / 65535))
+    left, top, width, height = metrics(user32)["virtual"]
+    # Обратный перевод обязан учитывать смещение виртуального экрана: иначе на
+    # конфигурации с монитором слева от основного проверка объявит верный клик промахом.
+    expected = (left + round(norm[0] * (width - 1) / 65535),
+                top + round(norm[1] * (height - 1) / 65535))
     if abs(landed[0] - expected[0]) > tolerance or abs(landed[1] - expected[1]) > tolerance:
         return {"moved": False, "landed": list(landed), "cursor_expected": list(expected),
                 "note": "курсор не встал на вычисленную точку — нажатие отменено"}

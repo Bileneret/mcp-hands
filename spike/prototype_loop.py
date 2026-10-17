@@ -62,7 +62,12 @@ def capture_screen(camera=None) -> dict:
         started = time.perf_counter()
         frame = camera.grab()
         if frame is None:
+            # На статичном экране Desktop Duplication не отдаёт новый кадр, а без
+            # запущенного захвата get_latest_frame() тоже возвращает None — без этой
+            # проверки шаг падал с AttributeError у NoneType.copy().
             frame = camera.get_latest_frame()
+        if frame is None:
+            raise RuntimeError("кадр недоступен: экран не менялся и захват не запущен")
         snapshot = frame.copy()
         elapsed_ms = (time.perf_counter() - started) * 1000.0
     finally:

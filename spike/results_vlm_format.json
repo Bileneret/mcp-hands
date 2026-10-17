@@ -1,0 +1,158 @@
+{
+ "crop": {
+  "size": [
+   1125,
+   700
+  ],
+  "source": "dxcam"
+ },
+ "ground_truth": {
+  "alpha": {
+   "left": 210,
+   "top": 239,
+   "right": 460,
+   "bottom": 352,
+   "center": [
+    335,
+    295
+   ]
+  },
+  "beta": {
+   "left": 560,
+   "top": 464,
+   "right": 810,
+   "bottom": 577,
+   "center": [
+    685,
+    520
+   ]
+  },
+  "gamma": {
+   "left": 335,
+   "top": 639,
+   "right": 585,
+   "bottom": 752,
+   "center": [
+    460,
+    695
+   ]
+  }
+ },
+ "load": {
+  "quantization": "4bit",
+  "cuda": true,
+  "gpu": "NVIDIA GeForce GTX 1650",
+  "vram_total_mb": 4096,
+  "load_ms": 10927,
+  "vram_used_mb": 1586,
+  "vram_reserved_mb": 1644,
+  "device_map": "—"
+ },
+ "targets": {
+  "alpha": {
+   "ms": 41299.3,
+   "raw": "```json\n[\n\t{\"bbox_2d\": [31, 85, 240, 244], \"label\": \"alpha\"}\n]\n```",
+   "image_grid": {
+    "size": [
+     800,
+     480
+    ],
+    "llm_tokens": 375
+   },
+   "box": null,
+   "hits": {}
+  },
+  "beta": {
+   "ms": 39100.8,
+   "raw": "<tool_call>(335,408),(555,584)<tool_call>",
+   "image_grid": {
+    "size": [
+     800,
+     480
+    ],
+    "llm_tokens": 375
+   },
+   "box": [
+    335.0,
+    408.0,
+    555.0,
+    584.0
+   ],
+   "hits": {
+    "A: 0..1000": {
+     "point": [
+      676,
+      522
+     ],
+     "hit": true,
+     "distance_px": 9.6
+    },
+    "B: пиксели картинки модели": {
+     "point": [
+      801,
+      898
+     ],
+     "hit": false,
+     "distance_px": 395.7
+    },
+    "C: пиксели кропа": {
+     "point": [
+      620,
+      671
+     ],
+     "hit": false,
+     "distance_px": 164.4
+    }
+   }
+  },
+  "gamma": {
+   "ms": 38851.8,
+   "raw": "(155, 681),(350, 800)",
+   "image_grid": {
+    "size": [
+     800,
+     480
+    ],
+    "llm_tokens": 375
+   },
+   "box": [
+    155.0,
+    681.0,
+    350.0,
+    800.0
+   ],
+   "hits": {
+    "A: 0..1000": {
+     "point": [
+      459,
+      693
+     ],
+     "hit": true,
+     "distance_px": 1.9
+    },
+    "B: пиксели картинки модели": {
+     "point": [
+      530,
+      1255
+     ],
+     "hit": false,
+     "distance_px": 564.3
+    },
+    "C: пиксели кропа": {
+     "point": [
+      428,
+      916
+     ],
+     "hit": false,
+     "distance_px": 222.9
+    }
+   }
+  }
+ },
+ "text_only": {
+  "text": "Четыре",
+  "ms": 1294.2,
+  "tokens": 5,
+  "image_grid": null
+ }
+}

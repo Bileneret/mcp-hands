@@ -69,7 +69,13 @@ CONTROL_TYPES = {
     if name.startswith("UIA_") and name.endswith("ControlTypeId")
 }
 
+# Минимальный профиль: столько свойств реально нужно агенту на шаге «найти и нажать».
+MINIMAL_PROPERTIES = tuple(
+    (name, prop_id) for name, prop_id in BASE_PROPERTIES
+    if name in ("name", "automation_id", "control_type", "rect", "enabled"))
+
 PROFILE_PROPERTIES = {
+    "minimal": MINIMAL_PROPERTIES,
     "base": BASE_PROPERTIES,
     "action": BASE_PROPERTIES + ACTION_PROPERTIES,
     "full": BASE_PROPERTIES + ACTION_PROPERTIES,
@@ -94,8 +100,23 @@ def read_timeouts() -> dict:
         return {"error": str(exc)}
 
 
+# Области кэша. TreeScope_Children (0x2) НЕ включает TreeScope_Element (0x1): запрос
+# «кэшируй детей» не кэширует свойства самих возвращённых элементов, поэтому чтение
+# Cached* у них падает с E_INVALIDARG. Правильные связки (проверено замером):
+#   Element|Children (0x3) — свойства самих элементов и их детей: хватает на 1-2 уровня,
+#       в 2.4 раза дешевле Subtree (21.5 против 50.7 мс на окне Блокнота);
+#   Subtree (0x5) — плюс всё поддерево: только он даёт клиентский спуск глубже двух
+#       уровней (на Блокноте уровни 3-4 читаются лишь с ним).
+SCOPE_ELEMENT_AND_CHILDREN = 0x1 | 0x2
+SCOPE_SUBTREE = 0x5
+
+
 def make_cache(uia, scope: int, profile: str = "action", patterns: bool = False):
-    """Кэш-реквест: набор свойств (и, опционально, паттернов) за один переход в чужой процесс."""
+    """Кэш-реквест: набор свойств (и, опционально, паттернов) за один переход в чужой процесс.
+
+    `scope` передаётся явно: для «найти и нажать» достаточно SCOPE_ELEMENT_AND_CHILDREN,
+    для построения карты на 3+ уровня нужен SCOPE_SUBTREE.
+    """
     cache = uia.CreateCacheRequest()
     cache.TreeScope = scope
     for _, prop_id in PROFILE_PROPERTIES[profile]:
@@ -320,9 +341,29 @@ def find_windows(exe: str, title_substring: str = "") -> list[dict]:
 
 
 def window_rect(hwnd: int) -> dict:
-    """Прямоугольник окна в физических пикселях (GetWindowRect, без DWM-теней)."""
+    """Прямоугольник ВИДИМОЙ рамки окна в физических пикселях.
+
+    `GetWindowRect` включает невидимые поля изменения размера (тень DWM): на стенде
+    расхождение составило 9 px слева, 9 справа и 9 снизу. Для кропов и координат нужен
+    `DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS)`; на старых системах, где вызов
+    не поддерживается, остаётся GetWindowRect.
+    """
     user32 = ctypes.WinDLL("user32", use_last_error=True)
     rect = wintypes.RECT()
     if not user32.GetWindowRect(wintypes.HWND(hwnd), ctypes.byref(rect)):
         raise OSError(f"GetWindowRect failed for hwnd={hwnd}")
-    return {"left": rect.left, "top": rect.top, "right": rect.right, "bottom": rect.bottom}
+    fallback = {"left": rect.left, "top": rect.top, "right": rect.right, "bottom": rect.bottom}
+    try:
+        dwmapi = ctypes.WinDLL("dwmapi", use_last_error=True)
+        frame = wintypes.RECT()
+        dwmapi.DwmGetWindowAttribute.argtypes = [wintypes.HWND, wintypes.DWORD,
+                                                 ctypes.c_void_p, wintypes.DWORD]
+        dwmapi.DwmGetWindowAttribute.restype = ctypes.c_long
+        hr = dwmapi.DwmGetWindowAttribute(wintypes.HWND(hwnd), 9,  # DWMWA_EXTENDED_FRAME_BOUNDS
+                                          ctypes.byref(frame), ctypes.sizeof(frame))
+        if hr == 0 and frame.right > frame.left and frame.bottom > frame.top:
+            return {"left": frame.left, "top": frame.top,
+                    "right": frame.right, "bottom": frame.bottom}
+    except OSError:
+        pass
+    return fallback

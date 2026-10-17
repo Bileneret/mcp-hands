@@ -42,7 +42,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--depth", type=int, default=3, help="глубина обхода")
     parser.add_argument("--mode", choices=("cached", "perparent", "naive", "descendants", "propcost"),
                         default="cached")
-    parser.add_argument("--profile", choices=("base", "action", "full"), default="action",
+    parser.add_argument("--profile", choices=("minimal", "base", "action", "full"), default="action",
                         help="набор свойств в кэш-реквесте")
     parser.add_argument("--patterns", action="store_true",
                         help="добавить в кэш сами паттерны (замер стоимости AddPattern)")
