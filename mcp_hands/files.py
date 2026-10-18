@@ -62,6 +62,40 @@ def _forbidden_roots() -> list[Path]:
     return [system_root, program_files, program_files_x86, program_data]
 
 
+# Разрешённые подпапки профиля пользователя (hardening по рекомендации аудита v18):
+# корень профиля, %APPDATA% и %LOCALAPPDATA% запрещены — там конфигурации и
+# хранилища программ; целевые пользовательские папки (Downloads и подобные)
+# остаются рабочими для задач.
+PROFILE_ALLOWED_SUBDIRS = {"downloads", "documents", "desktop",
+                           "pictures", "videos", "music"}
+
+
+def _profile_guard(resolved: Path) -> None:
+    """Корень профиля запрещён, кроме целевых пользовательских папок;
+    внутри AppData/LocalAppData разрешён только каталог Temp (временные файлы
+    тестов и прогонов)."""
+    profile = Path(os.environ.get("USERPROFILE", "")).resolve(strict=False)
+    if profile == Path(""):
+        return
+    under_profile = profile in resolved.parents
+    if resolved != profile and not under_profile:
+        return
+    if resolved == profile:
+        raise FilesPolicyError(f"корень профиля пользователя менять нельзя: {resolved}")
+    first = resolved.relative_to(profile).parts[0].lower()
+    if first in PROFILE_ALLOWED_SUBDIRS:
+        return
+    if first == "appdata":
+        # внутри AppData разрешён только Temp: pytest и временные каталоги прогонов
+        parts = [part.lower() for part in resolved.relative_to(profile).parts]
+        if len(parts) >= 3 and parts[1] == "local" and parts[2] == "temp":
+            return
+    raise FilesPolicyError(
+        f"область профиля запрещена; рабочие папки: Downloads/Документы/"
+        f"Рабочий стол/Картинки/Видео/Музыка и %LOCALAPPDATA%\\Temp — "
+        f"а указано: {resolved}")
+
+
 def ensure_allowed(path: Path) -> Path:
     """Путь разрешён к изменению: абсолютный, не корень диска, не под системной областью."""
     target = Path(path)
@@ -77,6 +111,7 @@ def ensure_allowed(path: Path) -> Path:
             continue
         if resolved == root_resolved or root_resolved in resolved.parents:
             raise FilesPolicyError(f"системная область запрещена: {resolved}")
+    _profile_guard(resolved)
     return resolved
 
 

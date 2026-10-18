@@ -75,3 +75,27 @@ def test_trash_puts_file_into_recycle_bin(tmp_path):
 def test_trash_refuses_system_path_before_touching(tmp_path):
     with pytest.raises(FilesPolicyError):
         trash([r"C:\Windows\System32\drivers\etc\hosts"])
+
+
+def test_profile_guard_allows_targets_forbids_configs(tmp_path, monkeypatch):
+    """Hardening (аудит v18): корень профиля и AppData запрещены; целевые папки
+    (Downloads и подобные) и %LOCALAPPDATA%\\Temp разрешены. На диске у профиля
+    папки называются по-английски (Documents, а не «Документы»)."""
+    profile = tmp_path / "profile"
+    for name in ("Downloads", "Documents", "AppData"):
+        (profile / name).mkdir(parents=True)
+    monkeypatch.setenv("USERPROFILE", str(profile))
+    monkeypatch.setenv("APPDATA", str(profile / "AppData" / "Roaming"))
+    monkeypatch.setenv("LOCALAPPDATA", str(profile / "AppData" / "Local"))
+
+    ensure_allowed(profile / "Downloads" / "задача.txt")          # рабочая папка: ок
+    ensure_allowed(profile / "Documents" / "отчёт.docx")          # ок
+    ensure_allowed(profile / "AppData" / "Local" / "Temp" / "p")  # временные: ок
+    with pytest.raises(FilesPolicyError, match="корень профиля"):
+        ensure_allowed(profile)
+    with pytest.raises(FilesPolicyError, match="область профиля запрещена"):
+        ensure_allowed(profile / "AppData" / "Roaming" / "Программа")  # конфиги
+    with pytest.raises(FilesPolicyError, match="область профиля запрещена"):
+        ensure_allowed(profile / "зачем-то-файл-в-корне.txt")
+    with pytest.raises(FilesPolicyError, match="область профиля запрещена"):
+        ensure_allowed(profile / "AppData" / "Local" / "СтранныйСофт")  # не Temp
