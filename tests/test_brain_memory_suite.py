@@ -52,16 +52,15 @@ def test_runner_writes_steps_and_incidents_to_memory(memory, tmp_path):
 
 
 def test_suite_dry_llm_records_all_selected_tasks(tmp_path):
-    """Сьюта на непокрытых задачах: честный missing_tools по именам, без имитации.
-    Берём заведомо непокрытые (браузерные b04/b07): список покрытых растёт —
-    при обновлении колонн меняй и выборку этого теста."""
-    summary = run_suite(task_ids=["b04", "b07"], db_path=tmp_path / "m.db")
+    """Сьюта на непокрытой задаче: честный missing_tools по именам, без имитации.
+    Единственная непокрытая — b07 (YouTube; замена/факультатив — решение владельца),
+    покрытые задачи растут — при обновлении колонн меняй и выборку этого теста."""
+    summary = run_suite(task_ids=["b07"], db_path=tmp_path / "m.db")
     assert summary["mode"].startswith("scripted")
-    by_id = {row["task_id"]: row for row in summary["tasks"]}
-    assert by_id["b04"]["status"] == "missing_tools"
-    assert "browser_collect_sources" in by_id["b04"]["reason"]
-    assert "browser_youtube_capture" in by_id["b07"]["reason"]
-    assert summary["passed"] == 0 and summary["missing_tools"] == 2
+    row = summary["tasks"][0]
+    assert row["status"] == "missing_tools"
+    assert "browser_youtube_capture" in row["reason"]
+    assert summary["passed"] == 0 and summary["missing_tools"] == 1
 
 
 def test_suite_b08_stand_passes_or_skips_without_recycle_bin(tmp_path):
@@ -110,4 +109,19 @@ def test_suite_b09_stand_passes(tmp_path):
     summary = run_suite(task_ids=["b09"], db_path=tmp_path / "m.db")
     row = summary["tasks"][0]
     assert row["status"] == "passed", row
+    assert summary["failed"] == 0, summary
+
+
+def test_suite_browser_stands_pass(tmp_path):
+    """Браузерные стенды колонны C: b06 (сессия вкладок с дубликатом → остались
+    ровно keep) и b04 (источники со страницы → CSV). Внешний веб не используется;
+    при отсутствии Edge тест пропускается с причиной."""
+    from mcp_hands.scenarios.browser_links import edge_path
+
+    if not edge_path():
+        pytest.skip("не найден msedge.exe — браузерные стенды недоступны в этой среде")
+    summary = run_suite(task_ids=["b06", "b04"], db_path=tmp_path / "m.db")
+    by_id = {row["task_id"]: row for row in summary["tasks"]}
+    assert by_id["b06"]["status"] == "passed", by_id["b06"]
+    assert by_id["b04"]["status"] == "passed", by_id["b04"]
     assert summary["failed"] == 0, summary

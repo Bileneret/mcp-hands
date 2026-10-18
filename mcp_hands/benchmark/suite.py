@@ -178,10 +178,104 @@ def _stand_excel_merge(workdir: Path) -> dict:
     return {"plan": plan, "stand": str(workdir)}
 
 
+def _stand_tabs_session(workdir: Path) -> dict:
+    """Стенд задачи b06: три страницы-файла → сессия вкладок с дубликатом → разбор.
+
+    Вкладки: A (дважды), B — постусловие инструмента: остаются ровно keep (A, B).
+    """
+    page_a = workdir / "страница_A.html"
+    page_b = workdir / "страница_B.html"
+    page_a.write_text("<html><head><title>Alpha</title></head><body>A</body></html>",
+                      encoding="utf-8")
+    page_b.write_text("<html><head><title>Beta</title></head><body>B</body></html>",
+                      encoding="utf-8")
+    url_a = page_a.resolve().as_uri()
+    url_b = page_b.resolve().as_uri()
+    report = workdir / "отчёт_вкладок.json"
+    plan = {"task_id": "b06", "steps": [
+        {"action": "browser_tabs_audit",
+         "args": {"urls": [url_a, url_a, url_b, url_a], "output": str(report),
+                  "keep": [url_a, url_b]},
+         "expect": {"kind": "file_exists", "params": {"path": str(report)}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
+def _stand_sources_page(workdir: Path) -> dict:
+    """Стенд задачи b04: страница с четырьмя карточками источников (article.source)."""
+    cards = [
+        ("Иванов И. И.", "2019", "https://example.org/alpha", "Альфа-исследование"),
+        ("Петров П. П.", "2021", "https://example.org/beta", "Бета-обзор"),
+        ("Сидоров С. С.", "2018", "https://example.org/gamma", "Гамма-метод"),
+        ("Кузнецова К. К.", "2022", "https://example.org/delta", "Дельта-анализ"),
+    ]
+    items = "\n".join(
+        f'<article class="source" data-year="{year}">'
+        f'<a href="{url}">{title}</a><span class="author">{author}</span></article>'
+        for author, year, url, title in cards)
+    page = workdir / "источники.html"
+    page.write_text(f"<html><head><title>Стенд источников</title></head>"
+                    f"<body><main>{items}</main></body></html>", encoding="utf-8")
+    csv_out = workdir / "источники.csv"
+    plan = {"task_id": "b04", "steps": [
+        {"action": "browser_collect_sources",
+         "args": {"url": page.resolve().as_uri(), "output_csv": str(csv_out)},
+         "expect": {"kind": "file_contains",
+                    "params": {"path": str(csv_out), "needle": "Иванов И. И."}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
+ARTICLE_PAGE = ("<html><head><title>Статья стенда</title></head><body><article>"
+                "<h1>Метод локальной автоматизации интерфейсов</h1>"
+                "<p>Введение: задача автоматизации рутинных операций на рабочем столе.</p>"
+                "<p>Метод: адресные запросы к дереву доступности вместо обхода пикселей.</p>"
+                "<p>Результат: устойчивое выполнение сценариев без вмешательства.</p>"
+                "</article></body></html>")
+
+
+def _stand_extract_article(workdir: Path) -> dict:
+    """Стенд задачи b05: статья-страница → документ Word с оформлением цитаты."""
+    page = workdir / "статья.html"
+    page.write_text(ARTICLE_PAGE, encoding="utf-8")
+    docx = workdir / "статья_с_цитатой.docx"
+    plan = {"task_id": "b05", "steps": [
+        {"action": "browser_extract_text",
+         "args": {"url": page.resolve().as_uri(), "output_docx": str(docx)},
+         "expect": {"kind": "file_exists", "params": {"path": str(docx), "min_bytes": 2000}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
+def _stand_lab_report(workdir: Path) -> dict:
+    """Стенд задачи b10 (комбо): источники → CSV, статья → Word, Word → PDF."""
+    sources = _stand_sources_page(workdir)
+    article = workdir / "статья.html"
+    article.write_text(ARTICLE_PAGE, encoding="utf-8")
+    article_url = article.resolve().as_uri()
+    csv_out = workdir / "источники.csv"
+    docx = workdir / "доклад.docx"
+    pdf = workdir / "доклад.pdf"
+    plan = {"task_id": "b10", "steps": [
+        {"action": "browser_collect_sources",
+         "args": {"url": sources["plan"]["steps"][0]["args"]["url"],
+                  "output_csv": str(csv_out)},
+         "expect": {"kind": "file_contains",
+                    "params": {"path": str(csv_out), "needle": "Иванов И. И."}}},
+        {"action": "browser_extract_text",
+         "args": {"url": article_url, "output_docx": str(docx)},
+         "expect": {"kind": "file_exists", "params": {"path": str(docx), "min_bytes": 2000}}},
+        {"action": "word_docx_to_pdf",
+         "args": {"path": str(docx), "output_pdf": str(pdf)},
+         "expect": {"kind": "file_exists", "params": {"path": str(pdf), "min_bytes": 2000}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
 STANDS: dict[str, object] = {"b08": _stand_downloads,
                              "b01": _stand_report_from_template,
                              "b02": _stand_format_document,
-                             "b09": _stand_excel_merge}
+                             "b09": _stand_excel_merge,
+                             "b06": _stand_tabs_session,
+                             "b04": _stand_sources_page,
+                             "b05": _stand_extract_article,
+                             "b10": _stand_lab_report}
 
 
 def _record_missing(task, memory: Memory) -> dict:

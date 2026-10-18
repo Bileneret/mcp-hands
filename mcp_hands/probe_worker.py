@@ -252,15 +252,22 @@ class Worker:
 
         Каждая под-операция подтверждается ПЕРЕЧТЕНИЕМ свойства (а не кодом
         возврата): стиль найденного абзаца, имя/размер шрифта, правила интервалов,
-        число таблиц оглавления. Ошибка одной под-операции не убивает остальные —
-        она фиксируется в её записи (локализованный Word отказывает на чужих
-        именах стилей: применяем builtin-коды, не зависящие от языка).
+        число таблиц оглавления. Ошибка одной под-операции не убивает остальные.
+
+        Стили: кодами применяются ТОЛЬКО проверенные на живом Word заголовки
+        (Heading 1..9); у прочих стилей справочные коды оказались ложными
+        (диагностика: «Quote = -185» в русском Word — это табличный стиль
+        «Средняя сетка», применение кода отказывает). Такие стили применяются
+        по имени с фолбэком на локализованное: план даёт международное имя
+        («Quote»), при отказе пробуется «Цитата».
         """
-        # wdBuiltinStyle: имена не зависят от локали Word.
-        builtin_styles = {"Normal": -1, "Heading 1": -2, "Heading 2": -3, "Heading 3": -4,
+        builtin_styles = {"Heading 1": -2, "Heading 2": -3, "Heading 3": -4,
                           "Heading 4": -5, "Heading 5": -6, "Heading 6": -7,
-                          "Heading 7": -8, "Heading 8": -9, "Heading 9": -10,
-                          "Title": -63, "Subtitle": -75, "Caption": -35}
+                          "Heading 7": -8, "Heading 8": -9, "Heading 9": -10}
+        style_aliases = {"Quote": ("Quote", "Цитата"),
+                         "Title": ("Title", "Название"),
+                         "Subtitle": ("Subtitle", "Подзаголовок"),
+                         "Caption": ("Caption", "Название объекта")}
         document = self.word.ActiveDocument
         applied: list[dict] = []
 
@@ -301,8 +308,21 @@ class Worker:
                         if not record["ok"] and is_heading:
                             record["reason"] = f"абзац не стал заголовком (уровень {outline})"
                     else:
-                        rng.Paragraphs.Style = name  # локальное имя — на ответственности плана
-                        record.update({"style": name, "ok": True})
+                        # Имя с фолбэком на локализованное (проверяем применением).
+                        candidates = style_aliases.get(name, (name,))
+                        attempt_errors = []
+                        for candidate in candidates:
+                            try:
+                                rng.Paragraphs.Style = candidate
+                                record.update({"style": str(candidate),
+                                               "in_use": bool(document.Styles(candidate).InUse),
+                                               "ok": bool(document.Styles(candidate).InUse)})
+                                break
+                            except Exception as exc:  # noqa: BLE001 — пробуем следующий алиас
+                                attempt_errors.append(f"{candidate}: {str(exc)[:80]}")
+                        if not record.get("ok"):
+                            record["reason"] = ("стиль не применился ни одним именем: "
+                                                + "; ".join(attempt_errors))
                 elif op == "set_font":
                     if action.get("name"):
                         rng.Font.Name = str(action["name"])

@@ -24,11 +24,13 @@ from pathlib import Path
 from dataclasses import dataclass, field
 
 from ..mcp_server import TOOL_NAMES, ToolResult
-from ..mcp_server import (browser_links_run, click_node, content_map, element_find,
-                          element_text, excel_workbook_build, fs_sort_by_type,
-                          fs_trash_move, health, hotkey, notepad_run, ocr_window,
-                          type_text, window_activate, windows_list,
-                          word_format_document, word_pdf_run, word_report_from_template)
+from ..mcp_server import (browser_collect_sources, browser_extract_text,
+                          browser_links_run, browser_tabs_audit, click_node,
+                          content_map, element_find, element_text, excel_workbook_build,
+                          fs_sort_by_type, fs_trash_move, health, hotkey, notepad_run,
+                          ocr_window, type_text, window_activate, windows_list,
+                          word_docx_to_pdf, word_format_document, word_pdf_run,
+                          word_report_from_template)
 from ..checkpoints import CheckpointStore
 from .plan import Plan
 
@@ -60,6 +62,10 @@ DISPATCH_TABLE: dict[str, object] = {
     "word_report_from_template": word_report_from_template,
     "word_format_document": word_format_document,
     "excel_workbook_build": excel_workbook_build,
+    "browser_tabs_audit": browser_tabs_audit,
+    "browser_collect_sources": browser_collect_sources,
+    "browser_extract_text": browser_extract_text,
+    "word_docx_to_pdf": word_docx_to_pdf,
 }
 
 assert set(DISPATCH_TABLE) == set(TOOL_NAMES), (

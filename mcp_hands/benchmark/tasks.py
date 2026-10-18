@@ -38,7 +38,7 @@ TASKS: list[BenchmarkTask] = [
     BenchmarkTask("b05", "Браузер: текст статьи → Word с оформлением цитаты",
                   needs=["browser_extract_text", "word_report_from_template"]),
     BenchmarkTask("b06", "Браузер: разобрать сессию вкладок (сгруппировать, сохранить, закрыть лишнее)",
-                  needs=["browser_tabs_manage"]),
+                  needs=["browser_tabs_audit"]),
     BenchmarkTask("b07", "YouTube: найти видео, субтитры/скорость, выписать таймкоды",
                   needs=["browser_youtube_capture"],
                   note="окно вне headless — риски фокуса"),
@@ -48,7 +48,7 @@ TASKS: list[BenchmarkTask] = [
     BenchmarkTask("b09", "Excel/CSV: свести данные из файлов + построить график",
                   needs=["excel_workbook_build"]),
     BenchmarkTask("b10", "Комбо-витрина: «отчёт по лабе» — поиск → таблица → оформление → PDF",
-                  needs=["browser_extract_text", "word_report_from_template", "word_pdf_run"]),
+                  needs=["browser_collect_sources", "browser_extract_text", "word_docx_to_pdf"]),
 ]
 
 

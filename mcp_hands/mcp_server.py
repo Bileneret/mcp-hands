@@ -43,7 +43,9 @@ TOOL_NAMES = frozenset({
     "window_activate", "click_node", "type_text", "hotkey",
     "notepad_run", "word_pdf_run", "browser_links_run", "health",
     "fs_trash_move", "fs_sort_by_type",
-    "word_report_from_template", "word_format_document", "excel_workbook_build"})
+    "word_report_from_template", "word_format_document", "excel_workbook_build",
+    "browser_tabs_audit", "browser_collect_sources",
+    "browser_extract_text", "word_docx_to_pdf"})
 
 server = MCPServer(
     name="mcp-hands",
@@ -777,6 +779,179 @@ def excel_workbook_build(inputs: list[str], output: str, sheet_name: str = "Св
                                  f"сверка с диска: {'ок' if not detail['mismatches'] else 'есть расхождения'}"),
                         detail=detail)
     _journal("excel_workbook_build", started, result, {"files": len(files)})
+    return result
+
+
+# --- браузерные инструменты (колонна C: свой headless-браузер, локальные страницы) ---
+
+
+@server.tool(structured_output=True)
+def browser_tabs_audit(urls: list[str], output: str, keep: list[str] | None = None,
+                       close_extras: bool = True) -> ToolResult:
+    """Разбор сессии вкладок: открыть заданные URL в СВОЁМ headless-браузере,
+    сгруппировать по домену, сохранить отчёт и (по умолчанию) закрыть лишнее.
+
+    `keep` — какие вкладки оставить (по умолчанию: уникальные из `urls`).
+    Постусловие: файл-отчёт на диске; после закрытия на отладочном порту
+    остались ровно вкладки из `keep` (перечитывание списка ПОСЛЕ действия).
+    Чужой браузер не затрагивается: всё в своём профиле каталога прогона.
+    """
+    started = time.perf_counter()
+    if not urls:
+        return _fail("browser_tabs_audit", started, "пустой список urls", True)
+    from pathlib import Path as _Path
+
+    from .browser import tabs_audit
+
+    profile_root = _Path(output).parent / "browser_profile"
+    outcome = tabs_audit(urls, output, keep=keep, close_extras=close_extras,
+                         profile_root=profile_root)
+    result = ToolResult(ok=bool(outcome.get("ok")), refused=False,
+                        reason=outcome.get("reason", ""),
+                        summary=(f"вкладок открыто {len(outcome.get('opened', []))}, "
+                                 f"закрыто {len(outcome.get('closed', []))}, "
+                                 f"осталось {len(outcome.get('remaining', []))}"),
+                        detail=outcome)
+    _journal("browser_tabs_audit", started, result, {"urls": len(urls)})
+    return result
+
+
+@server.tool(structured_output=True)
+def browser_collect_sources(url: str, output_csv: str) -> ToolResult:
+    """Собрать источники со страницы-стенда в CSV (автор, год, ссылка, заголовок).
+
+    Контракт страницы: карточки `article.source` (ссылка `a[href]`, автор `.author`,
+    год в `data-year`). Постусловие: CSV на диске, и повторный подсчёт карточек
+    в DOM ПОСЛЕ записи совпадает с числом строк CSV.
+    """
+    started = time.perf_counter()
+    from pathlib import Path as _Path
+
+    from .browser import collect_sources
+
+    profile_root = _Path(output_csv).parent / "browser_profile"
+    outcome = collect_sources(url, output_csv, profile_root=profile_root)
+    result = ToolResult(ok=bool(outcome.get("ok")), refused=False,
+                        reason=outcome.get("reason", ""),
+                        summary=f"собрано источников: {outcome.get('rows', 0)}",
+                        detail=outcome)
+    _journal("browser_collect_sources", started, result, {"url": url})
+    return result
+
+
+@server.tool(structured_output=True)
+def browser_extract_text(url: str, output_docx: str) -> ToolResult:
+    """Текст статьи со страницы → документ Word с оформлением цитаты.
+
+    Заголовок и ссылка оформляются абзацем-цитатой (стиль Quote), ниже — текст
+    статьи. Постусловие L1: файл непустой, стиль цитаты применён (InUse);
+    независимое подтверждение L2 (zipfile/XML) делает runner после шага.
+    """
+    started = time.perf_counter()
+    from pathlib import Path as _Path
+
+    from .browser import extract_article
+    from .office import WordSession
+    from .probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeProcess
+
+    profile_root = _Path(output_docx).parent / "browser_profile"
+    article = extract_article(url, profile_root=profile_root)
+    if not article.get("ok"):
+        return _fail("browser_extract_text", started,
+                     f"статья не собрана: {article.get('reason', '')}", True)
+    quote = f"{article['title']}\nИсточник: {article['url']}"
+    body = f"{quote}\n\n{article['text']}"
+    word = None
+    try:
+        with ProbeProcess(default_timeout_s=DOMAIN_OPERATION_TIMEOUT_S) as satellite:
+            word = WordSession(satellite)
+            if not word.start().ok:
+                return _fail("browser_extract_text", started, "Word не поднялся")
+            created = word.new_document(body)
+            if not created.ok:
+                return _fail("browser_extract_text", started,
+                             f"документ не создан: {created.reason}")
+            formatted = word.format_document([
+                {"op": "set_style", "find": article["title"], "style": "Quote"}])
+            if not (formatted.ok and (formatted.value or {}).get("all_ok")):
+                return _fail("browser_extract_text", started,
+                             f"стиль цитаты не применён: {formatted.reason or formatted.value}")
+            saved = word.save_as(output_docx)
+            target = _Path(output_docx)
+            size = target.stat().st_size if target.exists() else 0
+            outcome_ok = saved.ok and size > 0
+            detail = {"file": str(target), "bytes": size, "title": article["title"],
+                      "text_chars": len(article["text"]),
+                      "format": formatted.value, "save_outcome": saved.describe()}
+    except Exception as exc:  # noqa: BLE001
+        return _fail("browser_extract_text", started, f"{type(exc).__name__}: {exc}")
+    finally:
+        if word is not None and word.pid:
+            try:
+                word.quit()
+            except Exception:  # noqa: BLE001
+                pass
+    result = ToolResult(ok=outcome_ok, reason="" if outcome_ok else "документ не сохранён",
+                        summary=f"статья {detail['text_chars']} знаков → {output_docx} "
+                                f"({detail['bytes']} байт)",
+                        detail=detail)
+    _journal("browser_extract_text", started, result, {"url": url})
+    return result
+
+
+@server.tool(structured_output=True)
+def word_docx_to_pdf(path: str, output_pdf: str) -> ToolResult:
+    """Экспорт готового документа Word в PDF (открыть → ExportAsFixedFormat).
+
+    Кирпич для составных задач (b10): подтверждение — PDF на диске и его текст
+    читается независимым парсером (pypdf).
+    """
+    started = time.perf_counter()
+    from pathlib import Path as _Path
+
+    if not _Path(path).is_file():
+        return _fail("word_docx_to_pdf", started, f"документ не найден: {path}", True)
+    from .office import WordSession
+    from .probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeProcess
+
+    word = None
+    try:
+        with ProbeProcess(default_timeout_s=DOMAIN_OPERATION_TIMEOUT_S) as satellite:
+            word = WordSession(satellite)
+            if not word.start().ok:
+                return _fail("word_docx_to_pdf", started, "Word не поднялся")
+            opened = word.open(path)
+            if not opened.ok:
+                return _fail("word_docx_to_pdf", started,
+                             f"документ не открылся: {opened.reason}")
+            exported = word.export_pdf(output_pdf)
+            target = _Path(output_pdf)
+            size = target.stat().st_size if target.exists() else 0
+            text_chars = 0
+            if size > 0:
+                try:
+                    from pypdf import PdfReader
+
+                    reader = PdfReader(str(target))
+                    text_chars = sum(len(page.extract_text() or "") for page in reader.pages)
+                except Exception as exc:  # noqa: BLE001 — битый PDF = результат
+                    return _fail("word_docx_to_pdf", started, f"PDF нечитаем: {exc}")
+            outcome_ok = exported.ok and size > 0 and text_chars > 0
+            detail = {"file": str(target), "bytes": size, "text_chars": text_chars,
+                      "export_outcome": exported.describe()}
+    except Exception as exc:  # noqa: BLE001
+        return _fail("word_docx_to_pdf", started, f"{type(exc).__name__}: {exc}")
+    finally:
+        if word is not None and word.pid:
+            try:
+                word.quit()
+            except Exception:  # noqa: BLE001
+                pass
+    result = ToolResult(ok=outcome_ok,
+                        reason="" if outcome_ok else "PDF не создан или пуст",
+                        summary=f"PDF {detail['bytes']} байт, знаков {detail['text_chars']}",
+                        detail=detail)
+    _journal("word_docx_to_pdf", started, result, {"path": path})
     return result
 
 
