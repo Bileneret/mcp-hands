@@ -43,7 +43,7 @@ TOOL_NAMES = frozenset({
     "window_activate", "click_node", "type_text", "hotkey",
     "notepad_run", "word_pdf_run", "browser_links_run", "health",
     "fs_trash_move", "fs_sort_by_type",
-    "word_report_from_template", "word_format_document"})
+    "word_report_from_template", "word_format_document", "excel_workbook_build"})
 
 server = MCPServer(
     name="mcp-hands",
@@ -636,6 +636,147 @@ def word_format_document(path: str, actions: list, save_as: str = "") -> ToolRes
                                  f"{detail['format'].get('toc_count')} ({detail['bytes']} байт)"),
                         detail=detail)
     _journal("word_format_document", started, result, {"path": path})
+    return result
+
+
+# --- офисные инструменты (колонна A: Word-композиции, Excel) ---------------------
+
+
+def _values_equal(left, right) -> bool:
+    """Сверка ячейки Excel с исходным значением CSV: числа — численно, текст — точно."""
+    if left is None and right is None:
+        return True
+    if isinstance(left, (int, float)) and not isinstance(left, bool):
+        try:
+            return abs(float(left) - float(str(right).replace(",", "."))) < 1e-9
+        except (TypeError, ValueError):
+            return False
+    return str(left).strip() == str(right).strip()
+
+
+@server.tool(structured_output=True)
+def excel_workbook_build(inputs: list[str], output: str, sheet_name: str = "Свод",
+                         chart: dict | None = None) -> ToolResult:
+    """Свести данные из CSV-файлов в книгу Excel и, при заказе, построить диаграмму.
+
+    `inputs` — CSV (первая строка файла — заголовок; повторные заголовки следующих
+    файлов пропускаются). `output` — путь .xlsx. `chart` — `{"type": "column"|"line"|
+    "pie", "title": "..."}` по диапазону данных. Постусловие — сверка С ДИСКА:
+    книга закрывается и открывается заново, значения ячеек сличаются с исходными
+    данными, число диаграмм подтверждается. Excel поднимается и закрывается внутри.
+    """
+    started = time.perf_counter()
+    import csv
+    from pathlib import Path as _Path
+
+    files = [_Path(item) for item in inputs]
+    missing = [str(f) for f in files if not f.is_file()]
+    if missing:
+        return _fail("excel_workbook_build", started, f"нет CSV: {missing}", True)
+    if not inputs:
+        return _fail("excel_workbook_build", started, "пустой список inputs", True)
+
+    rows: list[list] = []
+    for index, path in enumerate(files):
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            parsed = [row for row in csv.reader(handle) if any(cell.strip() for cell in row)]
+        if not parsed:
+            return _fail("excel_workbook_build", started, f"{path.name}: пустой файл", True)
+        if index == 0:
+            rows.extend(parsed)
+        else:
+            header, *data = parsed
+            if header != rows[0]:
+                return _fail("excel_workbook_build", started,
+                             f"{path.name}: заголовок {header} не совпадает с первым файлом",
+                             True)
+            rows.extend(data)
+    height, width = len(rows), max(len(row) for row in rows)
+
+    from .office import ExcelSession
+    from .probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeProcess
+
+    excel = None
+    try:
+        with ProbeProcess(default_timeout_s=DOMAIN_OPERATION_TIMEOUT_S) as satellite:
+            excel = ExcelSession(satellite)
+            start = excel.start()
+            if not start.ok:
+                return _fail("excel_workbook_build", started,
+                             f"Excel не поднялся: {start.reason}")
+            created = excel.new_workbook(sheet_name)
+            if not created.ok:
+                return _fail("excel_workbook_build", started,
+                             f"книга не создана: {created.reason}")
+            filled = excel.fill("A1", rows)
+            written_info = filled.value or {}
+            if not filled.ok or written_info.get("rows") != height \
+                    or written_info.get("written", 0) <= 0:
+                return _fail("excel_workbook_build", started,
+                             f"данные записаны неполно: {filled.value} / ожидалось "
+                             f"{height} строк")
+            chart_info = {}
+            if chart:
+                source_range = f"A1:{chr(ord('A') + width - 1)}{height}"
+                kind = {"column": 51, "line": 4, "pie": 5}.get(str(chart.get("type", "column")), 51)
+                drawn = excel.add_chart(source_range, chart_type=kind,
+                                        title=str(chart.get("title", "")))
+                if not drawn.ok:
+                    return _fail("excel_workbook_build", started,
+                                 f"диаграмма не построена: {drawn.reason}")
+                chart_info = drawn.value or {}
+            saved = excel.save_as(output)
+            target = _Path(output)
+            exists = target.exists()
+            size = target.stat().st_size if exists else 0
+            if not (saved.ok and exists and size > 0):
+                return _fail("excel_workbook_build", started,
+                             f"книга не сохранена: {saved.reason}")
+            # Постусловие: читаем С ДИСКА — закрыть книгу и открыть заново
+            excel.close_workbook()
+            reopened = excel.open(output)
+            if not reopened.ok:
+                return _fail("excel_workbook_build", started,
+                             f"книга не открылась заново: {reopened.reason}")
+            last_cell = f"{chr(ord('A') + width - 1)}{height}"
+            read = excel.read(f"A1:{last_cell}")
+            if not read.ok:
+                return _fail("excel_workbook_build", started,
+                             f"не удалось перечитать книгу: {read.reason}")
+            values = (read.value or {}).get("values") or []
+            mismatches = []
+            for row_index, row in enumerate(rows):
+                for col_index, expected in enumerate(row):
+                    got = values[row_index][col_index] if row_index < len(values) \
+                        and col_index < len(values[row_index]) else None
+                    if not _values_equal(got, expected):
+                        mismatches.append({"cell": f"{chr(ord('A') + col_index)}{row_index + 1}",
+                                           "expected": expected, "got": got})
+            charts_on_disk = int((read.value or {}).get("charts_on_sheet", 0))
+            detail = {"file": str(target), "bytes": size, "rows": height, "cols": width,
+                      "cells_checked": height * width, "mismatches": mismatches[:5],
+                      "charts_on_disk": charts_on_disk, "chart": chart_info,
+                      "save_outcome": saved.describe()}
+            ok = not mismatches and (charts_on_disk >= 1 if chart else True)
+            reason = ""
+            if mismatches:
+                reason = f"рассогласование ячеек: {mismatches[:3]}"
+            elif chart and charts_on_disk < 1:
+                reason = "диаграмма не сохранилась на диск"
+    except Exception as exc:  # noqa: BLE001
+        return _fail("excel_workbook_build", started, f"{type(exc).__name__}: {exc}")
+    finally:
+        if excel is not None and excel.pid:
+            try:
+                excel.quit()
+            except Exception:  # noqa: BLE001
+                pass
+    result = ToolResult(ok=ok, reason=reason,
+                        summary=(f"книга {detail['rows']}×{detail['cols']}, "
+                                 f"диаграмм {detail['charts_on_disk']}, "
+                                 f"сверка с диска: {'ок' if not detail['mismatches'] else 'есть расхождения'}"),
+                        detail=detail)
+    _journal("excel_workbook_build", started, result, {"files": len(files)})
     return result
 
 

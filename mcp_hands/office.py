@@ -40,6 +40,7 @@ def _absolute(path: str) -> str:
     return str(Path(path).expanduser().resolve())
 
 WORD_IMAGE = "WINWORD.EXE"
+EXCEL_IMAGE = "EXCEL.EXE"
 WD_FORMAT_PDF = 17
 
 #: Бюджеты COM-операций подобраны по замерам на стенде и различаются по цене:
@@ -55,6 +56,16 @@ OFFICE_TIMEOUTS = {
     "word_replace": 45.0,
     "word_save_as": 60.0,
     "word_format": 60.0,
+    "excel_start": 30.0,
+    "excel_quit": 30.0,
+    "excel_status": 5.0,
+    "excel_new_workbook": 30.0,
+    "excel_fill": 30.0,
+    "excel_add_chart": 45.0,
+    "excel_save_as": 60.0,
+    "excel_close_workbook": 30.0,
+    "excel_open": 45.0,
+    "excel_read": 30.0,
 }
 DEFAULT_OFFICE_TIMEOUT_S = 45.0
 
@@ -258,6 +269,143 @@ class WordSession:
     def _timeout_reason(exc: Exception) -> str:
         return (f"COM-операция не ответила за отведённое время: сателлит снят "
                 f"({exc}). Вероятная причина — модальный диалог Word; нужен человек")
+
+    def _remember(self, op: str, outcome: OfficeOutcome) -> None:
+        self.history.append({"op": op, **outcome.describe()})
+        del self.history[:-20]
+
+
+class ExcelSession:
+    """Клиентская сторона Excel (колонна A, b09): операции в сателлите, как у Word.
+
+    Тот же контракт: бюджет на вызов, повторы на занятость сервера, живой сторож
+    модалок, опека pid через файл-реестр, `Quit` с ожиданием исчезновения процесса.
+    """
+
+    def __init__(self, probe: ProbeProcess, modal_watcher=None) -> None:
+        self.probe = probe
+        self.pid = 0
+        self.modal_watcher = modal_watcher
+        self.history: list[dict] = []
+
+    def start(self, visible: bool = False) -> OfficeOutcome:
+        outcome = self._call("excel_start", visible=visible)
+        if outcome.ok and isinstance(outcome.value, dict):
+            self.pid = int(outcome.value.get("pid") or 0)
+            if self.pid:
+                self.probe.track_process(self.pid, note="Excel через COM", image=EXCEL_IMAGE)
+                with_errors = self.probe.call("register_process", pid=self.pid,
+                                              image=EXCEL_IMAGE, note="Excel через COM",
+                                              timeout_s=DOMAIN_OPERATION_TIMEOUT_S)
+                outcome.details["registry"] = with_errors
+        return outcome
+
+    def quit(self, save: bool = False) -> OfficeOutcome:
+        """Закрывает Excel; при неуспехе процесса — принудительное добивание."""
+        outcome = self._call("excel_quit", save=save)
+        pid = self.pid
+        if pid:
+            gone = self._wait_process_gone(pid, timeout_s=15.0)
+            if not gone:
+                killed = self.probe.kill_tracked()
+                outcome.details["forced_kill"] = killed
+                outcome.reason = (outcome.reason or "закрытие не подтвердилось") + \
+                    f"; Excel снят принудительно ({killed})"
+                gone = self._wait_process_gone(pid, timeout_s=5.0)
+            outcome.details["process_gone"] = gone
+            if not gone:
+                outcome.ok = False
+                outcome.reason = f"Excel с pid {pid} продолжает работать после закрытия"
+            self.probe.untrack_process(pid)
+            try:
+                self.probe.call("unregister_process", pid=pid,
+                                timeout_s=DOMAIN_OPERATION_TIMEOUT_S)
+            except (ProbeError, ProbeTimeout):
+                pass
+            self.pid = 0
+        return outcome
+
+    def new_workbook(self, sheet_name: str = "Лист1") -> OfficeOutcome:
+        return self._call("excel_new_workbook", sheet_name=sheet_name)
+
+    def fill(self, start_cell: str, rows: list) -> OfficeOutcome:
+        return self._call("excel_fill", start_cell=start_cell, rows=rows)
+
+    def add_chart(self, source_range: str, chart_type: int = 51, title: str = "") -> OfficeOutcome:
+        return self._call("excel_add_chart", source_range=source_range,
+                          chart_type=chart_type, title=title)
+
+    def save_as(self, path: str) -> OfficeOutcome:
+        return self._call("excel_save_as", path=_absolute(path))
+
+    def close_workbook(self, save: bool = False) -> OfficeOutcome:
+        return self._call("excel_close_workbook", save=save)
+
+    def open(self, path: str) -> OfficeOutcome:
+        return self._call("excel_open", path=_absolute(path))
+
+    def read(self, address: str) -> OfficeOutcome:
+        return self._call("excel_read", address=address)
+
+    def status(self) -> OfficeOutcome:
+        return self._call("excel_status")
+
+    def _call(self, op: str, timeout_s: float | None = None, **kwargs) -> OfficeOutcome:
+        budget = timeout_s if timeout_s is not None else timeout_for(op)
+        started = time.perf_counter()
+        attempts = 0
+        last_reason = ""
+        while attempts < 3:
+            attempts += 1
+            guard = None
+            if self.modal_watcher is not None:
+                guard = lambda: self._modal_reason()  # noqa: E731
+            try:
+                value = self.probe.call(op, timeout_s=budget, on_tick=guard, **kwargs)
+                outcome = OfficeOutcome(True, value=value, attempts=attempts,
+                                        ms=(time.perf_counter() - started) * 1000.0)
+                self._remember(op, outcome)
+                return outcome
+            except ProbeAborted as exc:
+                outcome = OfficeOutcome(False, reason=str(exc), attempts=attempts,
+                                        modal_dialog=self._modal_reason(),
+                                        ms=(time.perf_counter() - started) * 1000.0)
+                self._remember(op, outcome)
+                return outcome
+            except ProbeTimeout as exc:
+                outcome = OfficeOutcome(False, reason=WordSession._timeout_reason(exc),
+                                        attempts=attempts,
+                                        ms=(time.perf_counter() - started) * 1000.0)
+                outcome.modal_dialog = self._modal_reason()
+                if outcome.modal_dialog:
+                    outcome.reason = (f"модальный диалог Excel ({outcome.modal_dialog}): "
+                                      f"нужен человек")
+                self._remember(op, outcome)
+                return outcome
+            except ProbeError as exc:
+                last_reason = str(exc)
+                if WordSession._is_busy(last_reason) and attempts < 3:
+                    time.sleep(0.1 * attempts)
+                    continue
+                outcome = OfficeOutcome(False, reason=last_reason, attempts=attempts,
+                                        ms=(time.perf_counter() - started) * 1000.0)
+                self._remember(op, outcome)
+                return outcome
+        return OfficeOutcome(False, reason=last_reason or "операция не удалась", attempts=attempts)
+
+    def _wait_process_gone(self, pid: int, timeout_s: float) -> bool:
+        deadline = time.time() + timeout_s
+        while time.time() < deadline:
+            if not self.probe.process_identity(pid)["image"]:
+                return True
+            time.sleep(0.25)
+        return not self.probe.process_identity(pid)["image"]
+
+    def _modal_reason(self) -> str:
+        if self.modal_watcher is None:
+            return ""
+        modal = self.modal_watcher.recent(word_pid=self.pid)
+        return f"модальный диалог Excel ({modal}): нужен человек" if modal else ""
 
     def _remember(self, op: str, outcome: OfficeOutcome) -> None:
         self.history.append({"op": op, **outcome.describe()})

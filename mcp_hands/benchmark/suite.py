@@ -157,9 +157,28 @@ def _stand_format_document(workdir: Path) -> dict:
     return {"plan": plan, "stand": str(workdir)}
 
 
+def _stand_excel_merge(workdir: Path) -> dict:
+    """Стенд задачи b09: два CSV с одинаковыми колонками → сведённая книга с графиком."""
+    first = workdir / "данные_январь_февраль.csv"
+    second = workdir / "данные_март_апрель.csv"
+    first.write_text("Месяц,Выручка\nЯнварь,120\nФевраль,150\n", encoding="utf-8")
+    second.write_text("Месяц,Выручка\nМарт,170\nАпрель,140\n", encoding="utf-8")
+    merged = workdir / "сводная_выручка.xlsx"
+    plan = {"task_id": "b09", "steps": [
+        {"action": "excel_workbook_build",
+         "args": {"inputs": [str(first), str(second)],
+                  "output": str(merged),
+                  "sheet_name": "Свод",
+                  "chart": {"type": "column", "title": "Выручка по месяцам"}},
+         "expect": {"kind": "file_exists",
+                    "params": {"path": str(merged), "min_bytes": 5000}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
 STANDS: dict[str, object] = {"b08": _stand_downloads,
                              "b01": _stand_report_from_template,
-                             "b02": _stand_format_document}
+                             "b02": _stand_format_document,
+                             "b09": _stand_excel_merge}
 
 
 def _record_missing(task, memory: Memory) -> dict:

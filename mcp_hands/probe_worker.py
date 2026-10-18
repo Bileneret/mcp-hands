@@ -28,6 +28,10 @@ class Worker:
         self._word = None
         self._word_version = ""
         self._word_process_id = 0
+        self._excel = None
+        self._excel_version = ""
+        self._excel_process_id = 0
+        self._excel_book = None
         # Строго до UIA и COM: comtypes создаёт скрытые окна для маршалинга, а поток
         # с окнами переключить рабочий стол уже нельзя (SetThreadDesktop вернёт 170).
         from .input import Actuator
@@ -116,12 +120,12 @@ class Worker:
         return self._word
 
     @staticmethod
-    def _winword_pids() -> set:
-        """Список процессов WINWORD.EXE.
+    def _process_pids(image: str) -> set:
+        """Список процессов по имени образа (общий механизм для Word/Excel).
 
         `Application.Hwnd` при позднем связывании может быть недоступно, поэтому pid
         определяется сравнением списка процессов до и после запуска: `DispatchEx`
-        создаёт НОВЫЙ экземпляр Word, и разница — это он.
+        создаёт НОВЫЙ экземпляр, и разница — это он.
         """
         import ctypes
         import ctypes.wintypes as wintypes
@@ -142,6 +146,7 @@ class Worker:
         needed = wintypes.DWORD(0)
         if not psapi.EnumProcesses(buffer, ctypes.sizeof(buffer), ctypes.byref(needed)):
             return set()
+        wanted = image.upper()
         found = set()
         for index in range(needed.value // ctypes.sizeof(wintypes.DWORD)):
             pid = int(buffer[index])
@@ -154,11 +159,19 @@ class Worker:
                 name = ctypes.create_unicode_buffer(1024)
                 size = wintypes.DWORD(len(name))
                 if kernel32.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(size)):
-                    if name.value.rsplit("\\", 1)[-1].upper() == "WINWORD.EXE":
+                    if name.value.rsplit("\\", 1)[-1].upper() == wanted:
                         found.add(pid)
             finally:
                 kernel32.CloseHandle(handle)
         return found
+
+    @staticmethod
+    def _winword_pids() -> set:
+        return Worker._process_pids("WINWORD.EXE")
+
+    @staticmethod
+    def _excel_pids() -> set:
+        return Worker._process_pids("EXCEL.EXE")
 
     def op_word_start(self, visible: bool = False) -> dict:
         """Поднимает Word: без предупреждений, невидимым, и сообщает свой pid."""
@@ -368,6 +381,145 @@ class Worker:
         pid = self._word_pid()
         self._word.Quit(0 if not save else -1)  # 0 = wdDoNotSaveChanges
         self._word = None
+        if pid:
+            self.op_unregister_process(pid=pid)
+        return {"closed": True, "pid": pid}
+
+    # --- Excel (колонна A: b09) -------------------------------------------
+
+    def op_excel_start(self, visible: bool = False) -> dict:
+        """Поднимает Excel: без предупреждений, невидимым, с опекой pid (как Word)."""
+        import win32com.client
+
+        self._prepare_com()
+        if self._excel is not None:
+            return {"pid": self._excel_pid(), "reused": True}
+        before = self._excel_pids()
+        application = win32com.client.DispatchEx("Excel.Application")
+        application.Visible = bool(visible)
+        application.DisplayAlerts = False
+        self._excel = application
+        self._excel_version = str(application.Version)
+        new_pids = sorted(self._excel_pids() - before)
+        self._excel_process_id = new_pids[0] if len(new_pids) == 1 else self._excel_pid()
+        registered = self.op_register_process(pid=self._excel_pid(), image="EXCEL.EXE",
+                                              note=f"Excel {self._excel_version} через COM")
+        return {"pid": self._excel_pid(), "version": self._excel_version,
+                "registry": registered, "new_processes": new_pids}
+
+    def _excel_pid(self) -> int:
+        return int(getattr(self, "_excel_process_id", 0) or 0)
+
+    @property
+    def excel(self):
+        if self._excel is None:
+            raise RuntimeError("Excel не поднят: сначала op_excel_start")
+        return self._excel
+
+    def op_excel_status(self) -> dict:
+        if self._excel is None:
+            return {"running": False}
+        try:
+            return {"running": True, "pid": self._excel_pid(),
+                    "version": self._excel_version,
+                    "workbooks": int(self._excel.Workbooks.Count)}
+        except Exception as exc:  # noqa: BLE001
+            return {"running": True, "pid": self._excel_pid(), "error": str(exc)}
+
+    def op_excel_new_workbook(self, sheet_name: str = "Лист1") -> dict:
+        workbook = self.excel.Workbooks.Add()
+        sheet = workbook.Worksheets(1)
+        sheet.Name = sheet_name
+        self._excel_book = workbook
+        return {"name": str(workbook.Name), "sheet": str(sheet.Name)}
+
+    def op_excel_fill(self, start_cell: str, rows: list) -> dict:
+        """Записывает 2D-данные (список строк) начиная с ячейки start_cell.
+
+        ЛОВУШКА (проверено диагностикой): присваивание ДВУМЕРНОГО массива
+        (`Range.Value2 = tuple(tuple(...))` и даже явный VARIANT VT_ARRAY) в этой
+        связке pywin32+Excel молча не срабатывает — «успех», а на листе пусто
+        (в дальнем углу оказывался один последний элемент). Скалярная запись
+        работает железно, поэтому пишем по ячейке: для десятков ячеек это
+        доли секунды, а надёжность дороже.
+        """
+        sheet = self._excel_book.Worksheets(1)
+        import re
+
+        match = re.fullmatch(r"([A-Za-z]+)(\d+)", start_cell.strip())
+        if not match:
+            raise ValueError(f"ячейка {start_cell!r} не распознана (формат A1)")
+        column_letters, row_number = match.group(1).upper(), int(match.group(2))
+        column = 0
+        for char in column_letters:
+            column = column * 26 + (ord(char) - ord("A") + 1)
+        written = 0
+        for row_offset, row in enumerate(rows):
+            for col_offset, value in enumerate(row):
+                if value is None:
+                    continue
+                sheet.Cells(row_number + row_offset, column + col_offset).Value2 = value
+                written += 1
+        return {"written": written, "rows": len(rows),
+                "cols": max((len(row) for row in rows), default=0)}
+
+    def op_excel_add_chart(self, source_range: str, chart_type: int = 51,
+                           title: str = "", left: float = 320.0, top: float = 40.0,
+                           width: float = 420.0, height: float = 260.0) -> dict:
+        """Диаграмма по диапазону (51 = xlColumnClustered, 4 = xlLine, 5 = xlPie)."""
+        sheet = self._excel_book.Worksheets(1)
+        chart_object = sheet.ChartObjects().Add(left, top, width, height)
+        chart = chart_object.Chart
+        chart.ChartType = int(chart_type)
+        chart.SetSourceData(sheet.Range(source_range))
+        if title:
+            chart.HasTitle = True
+            chart.ChartTitle.Text = str(title)
+        return {"chart_type": int(chart.ChartType),
+                "charts_on_sheet": int(sheet.ChartObjects().Count),
+                "title": str(chart.ChartTitle.Text) if chart.HasTitle else ""}
+
+    def op_excel_save_as(self, path: str) -> dict:
+        """Сохраняет книгу (51 = xlOpenXMLWorkbook — .xlsx)."""
+        import os
+
+        self._excel_book.SaveAs(path, FileFormat=51)
+        return {"path": str(path), "exists": os.path.exists(path),
+                "bytes": os.path.getsize(path) if os.path.exists(path) else 0}
+
+    def op_excel_close_workbook(self, save: bool = False) -> dict:
+        self._excel_book.Close(save)
+        self._excel_book = None
+        return {"closed": True, "workbooks_left": int(self.excel.Workbooks.Count)}
+
+    def op_excel_open(self, path: str) -> dict:
+        """Открывает книгу заново (постусловие: читать — с диска, а не из памяти)."""
+        workbook = self.excel.Workbooks.Open(path, ReadOnly=True,
+                                             UpdateLinks=0, AddToMru=False)
+        self._excel_book = workbook
+        return {"name": str(workbook.Name), "sheets": int(workbook.Worksheets.Count)}
+
+    def op_excel_read(self, address: str) -> dict:
+        """Читает диапазон: значения ячеек (для сверки результата на диске)."""
+        sheet = self._excel_book.Worksheets(1)
+        raw = sheet.Range(address).Value2
+        if raw is None:
+            values = None
+        elif not isinstance(raw, tuple):
+            values = [[raw]]
+        else:
+            values = [list(row) if isinstance(row, tuple) else [row] for row in raw]
+        return {"address": address, "values": values,
+                "charts_on_sheet": int(sheet.ChartObjects().Count)}
+
+    def op_excel_quit(self, save: bool = False) -> dict:
+        """Закрывает Excel и снимает pid с учёта; ссылка обнуляется только при успехе."""
+        if self._excel is None:
+            return {"closed": True, "already": True}
+        pid = self._excel_pid()
+        self._excel.Quit()
+        self._excel = None
+        self._excel_book = None
         if pid:
             self.op_unregister_process(pid=pid)
         return {"closed": True, "pid": pid}

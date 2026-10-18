@@ -25,10 +25,10 @@ from dataclasses import dataclass, field
 
 from ..mcp_server import TOOL_NAMES, ToolResult
 from ..mcp_server import (browser_links_run, click_node, content_map, element_find,
-                          element_text, fs_sort_by_type, fs_trash_move, health, hotkey,
-                          notepad_run, ocr_window, type_text, window_activate,
-                          windows_list, word_format_document, word_pdf_run,
-                          word_report_from_template)
+                          element_text, excel_workbook_build, fs_sort_by_type,
+                          fs_trash_move, health, hotkey, notepad_run, ocr_window,
+                          type_text, window_activate, windows_list,
+                          word_format_document, word_pdf_run, word_report_from_template)
 from .plan import Plan
 
 # Статическая таблица диспетчеризации: имя инструмента → функция ядра.
@@ -51,6 +51,7 @@ DISPATCH_TABLE: dict[str, object] = {
     "fs_sort_by_type": fs_sort_by_type,
     "word_report_from_template": word_report_from_template,
     "word_format_document": word_format_document,
+    "excel_workbook_build": excel_workbook_build,
 }
 
 assert set(DISPATCH_TABLE) == set(TOOL_NAMES), (

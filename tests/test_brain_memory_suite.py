@@ -52,13 +52,15 @@ def test_runner_writes_steps_and_incidents_to_memory(memory, tmp_path):
 
 
 def test_suite_dry_llm_records_all_selected_tasks(tmp_path):
-    """Сьюта на непокрытых задачах: честный missing_tools по именам, без имитации."""
-    summary = run_suite(task_ids=["b07", "b09"], db_path=tmp_path / "m.db")
+    """Сьюта на непокрытых задачах: честный missing_tools по именам, без имитации.
+    Берём заведомо непокрытые (браузерные b04/b07): список покрытых растёт —
+    при обновлении колонн меняй и выборку этого теста."""
+    summary = run_suite(task_ids=["b04", "b07"], db_path=tmp_path / "m.db")
     assert summary["mode"].startswith("scripted")
     by_id = {row["task_id"]: row for row in summary["tasks"]}
-    assert by_id["b07"]["status"] == "missing_tools"
+    assert by_id["b04"]["status"] == "missing_tools"
+    assert "browser_collect_sources" in by_id["b04"]["reason"]
     assert "browser_youtube_capture" in by_id["b07"]["reason"]
-    assert "excel_workbook_build" in by_id["b09"]["reason"]
     assert summary["passed"] == 0 and summary["missing_tools"] == 2
 
 
@@ -98,4 +100,14 @@ def test_suite_b01_b02_stands_pass(tmp_path):
     by_id = {row["task_id"]: row for row in summary["tasks"]}
     assert by_id["b01"]["status"] == "passed", by_id["b01"]
     assert by_id["b02"]["status"] == "passed", by_id["b02"]
+    assert summary["failed"] == 0, summary
+
+
+@pytest.mark.office
+def test_suite_b09_stand_passes(tmp_path):
+    """Excel-стенд b09: два CSV → книга со сводом и диаграммой; инструмент
+    подтверждает результат сверкой С ДИСКА (закрыть→открыть→сличить ячейки)."""
+    summary = run_suite(task_ids=["b09"], db_path=tmp_path / "m.db")
+    row = summary["tasks"][0]
+    assert row["status"] == "passed", row
     assert summary["failed"] == 0, summary
