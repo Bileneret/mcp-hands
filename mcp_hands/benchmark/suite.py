@@ -306,6 +306,29 @@ STANDS: dict[str, object] = {"b08": _stand_downloads,
                              "b07": _stand_video_notes}
 
 
+def _aggregate_per_task(rows: list[dict]) -> dict:
+    """Статистика по задачам за все раунды: время avg/min/max и вердикты.
+
+    Считает только реальные прогоны (passed/failed): missing_tools — не время,
+    а честный пропуск, и в статистику времени не попадает.
+    """
+    stats: dict[str, dict] = {}
+    for row in rows:
+        entry = stats.setdefault(row["task_id"], {"runs": 0, "passed": 0, "failed": 0,
+                                                  "missing_tools": 0, "times_ms": []})
+        entry["runs"] += 1
+        entry[row["status"]] = entry.get(row["status"], 0) + 1
+        if row["status"] in ("passed", "failed") and row.get("total_ms"):
+            entry["times_ms"].append(float(row["total_ms"]))
+    for entry in stats.values():
+        times = entry.pop("times_ms")
+        if times:
+            entry["avg_ms"] = round(sum(times) / len(times), 1)
+            entry["min_ms"] = round(min(times), 1)
+            entry["max_ms"] = round(max(times), 1)
+    return stats
+
+
 def _record_missing(task, memory: Memory) -> dict:
     """Не покрытая задача: честная запись без имитации запуска."""
     run_id = memory.start_run(task.id, plan_source="none")
@@ -431,6 +454,7 @@ def run_suite(task_ids: list[str] | None = None, live: bool = False,
                    "passed": sum(1 for r in rows if r["status"] == "passed"),
                    "missing_tools": sum(1 for r in rows if r["status"] == "missing_tools"),
                    "failed": sum(1 for r in rows if r["status"] == "failed"),
+                   "per_task": _aggregate_per_task(rows),
                    "total_ms": round((time.perf_counter() - started) * 1000.0, 1),
                    "metrics": memory.metrics()}
         memory.close()
