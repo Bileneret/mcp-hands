@@ -149,11 +149,23 @@ class LiveBrowser:
     def _require(self) -> Cdp:
         if self.cdp is None:
             raise RuntimeError("браузер не подключён: live_browser start/connect")
+        if not self.tab:
+            # рабочая вкладка ещё не выбрана: у себя берём первую, в браузере
+            # ВЛАДЕЛЬЦА открываем СВОЮ (его вкладки не трогаем никогда)
+            if self.mode == "user":
+                tab = self.cdp.open_page("about:blank")
+                self.tab = tab
+                self.cdp.connect(tab["webSocketDebuggerUrl"])
+                self.cdp.call("Page.enable")
+            else:
+                self.ensure_tab()
         return self.cdp
 
     def ensure_tab(self) -> dict:
         """Первая вкладка типа page (или единственная) как рабочая точка."""
-        cdp = self._require()
+        cdp = self.cdp
+        if cdp is None:
+            raise RuntimeError("браузер не подключён: live_browser start/connect")
         pages = [tab for tab in cdp.endpoint("/json/list")
                  if tab.get("type") == "page"]
         if not pages:
@@ -182,6 +194,18 @@ class LiveBrowser:
 
     def navigate(self, url: str, load_timeout_s: float = 25.0) -> dict:
         cdp = self._require()
+        if self.mode == "user":
+            # В браузере ВЛАДЕЛЬЦА никогда не навигируем в его вкладках:
+            # открываем СВОЮ новую вкладку и работаем в ней — его страницы целы.
+            tab = cdp.open_page(url)
+            self.tab = tab
+            cdp.connect(tab["webSocketDebuggerUrl"])
+            cdp.call("Page.enable")
+            loaded = self.wait_for("document.readyState === 'complete'", load_timeout_s)
+            return {"url": self.evaluate("location.href"),
+                    "title": self.evaluate("document.title") or "",
+                    "ready": self.evaluate("document.readyState"), "loaded": loaded,
+                    "tab": "новая (своя)"}
         if not self.tab:
             self.ensure_tab()
         cdp.call("Page.navigate", url=url)
