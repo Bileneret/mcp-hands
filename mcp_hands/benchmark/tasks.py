@@ -43,7 +43,7 @@ TASKS: list[BenchmarkTask] = [
                   needs=["browser_youtube_capture"],
                   note="окно вне headless — риски фокуса"),
     BenchmarkTask("b08", "Файлы: разобрать папку загрузок по типам (удаление — только в корзину)",
-                  needs=["fs_trash_move"],
+                  needs=["fs_sort_by_type", "fs_trash_move"],
                   note="корзина разрешена политикой, полное удаление — нет"),
     BenchmarkTask("b09", "Excel/CSV: свести данные из файлов + построить график",
                   needs=["excel_workbook_build"]),

@@ -33,6 +33,34 @@ SCRIPTED_PLANS: dict[str, dict] = {
 }
 
 
+def _stand_downloads(workdir: Path) -> dict:
+    """Стенд задачи b08: папка-загрузки с известным набором файлов + план разбора.
+
+    Стенды нужны там, где план зависит от подготовленного окружения (файлы,
+    страницы-фикстуры): модель не должна угадывать пути — их даёт стенд.
+    """
+    source = workdir / "загрузки"
+    target = workdir / "разобрано"
+    source.mkdir(parents=True, exist_ok=True)
+    (source / "отчёт_лабы.pdf").write_text("PDF-заглушка", encoding="utf-8")
+    (source / "фото_стенда.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 32)
+    (source / "архив_данных.zip").write_bytes(b"PK\x03\x04" + b"0" * 32)
+    (source / "заметки.txt").write_text("заметки", encoding="utf-8")
+    (source / "мусор_времянка.tmp").write_text("временный файл", encoding="utf-8")
+    trash_path = target / "прочее" / "мусор_времянка.tmp"
+    plan = {"task_id": "b08", "steps": [
+        {"action": "fs_sort_by_type",
+         "args": {"source": str(source), "target_root": str(target)},
+         "expect": {"kind": "no_files_in", "params": {"dir": str(source)}}},
+        {"action": "fs_trash_move",
+         "args": {"paths": [str(trash_path)]},
+         "expect": {"kind": "paths_gone", "params": {"paths": [str(trash_path)]}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
+STANDS: dict[str, object] = {"b08": _stand_downloads}
+
+
 def _record_missing(task, memory: Memory) -> dict:
     """Не покрытая задача: честная запись без имитации запуска."""
     run_id = memory.start_run(task.id, plan_source="none")
@@ -88,6 +116,20 @@ def run_suite(task_ids: list[str] | None = None, live: bool = False,
     try:
         for task in TASKS:
             if task_ids and task.id not in task_ids:
+                continue
+            if task.id in STANDS:
+                stamp = time.strftime("%Y%m%d_%H%M%S")
+                stand_workdir = ARTIFACTS / "stands" / task.id / stamp
+                stand_workdir.mkdir(parents=True, exist_ok=True)
+                prepared = STANDS[task.id](stand_workdir)
+                plan = parse_plan(prepared["plan"])
+                run = run_plan(plan, limits or RunnerLimits(), memory=memory,
+                               plan_source="scripted-stand")
+                rows.append({"task_id": task.id,
+                             "status": "passed" if run.ok else "failed",
+                             "reason": run.reason, "total_ms": round(run.total_ms, 1),
+                             "replans": run.replans, "steps": len(run.steps),
+                             "stand": prepared["stand"]})
                 continue
             if task.id not in SCRIPTED_PLANS:
                 # задача не покрыта набором инструментов — честная фиксация

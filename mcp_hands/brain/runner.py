@@ -25,8 +25,9 @@ from dataclasses import dataclass, field
 
 from ..mcp_server import TOOL_NAMES, ToolResult
 from ..mcp_server import (browser_links_run, click_node, content_map, element_find,
-                          element_text, health, hotkey, notepad_run, ocr_window,
-                          type_text, window_activate, windows_list, word_pdf_run)
+                          element_text, fs_sort_by_type, fs_trash_move, health, hotkey,
+                          notepad_run, ocr_window, type_text, window_activate,
+                          windows_list, word_pdf_run)
 from .plan import Plan
 
 # Статическая таблица диспетчеризации: имя инструмента → функция ядра.
@@ -45,6 +46,8 @@ DISPATCH_TABLE: dict[str, object] = {
     "word_pdf_run": word_pdf_run,
     "browser_links_run": browser_links_run,
     "health": health,
+    "fs_trash_move": fs_trash_move,
+    "fs_sort_by_type": fs_sort_by_type,
 }
 
 assert set(DISPATCH_TABLE) == set(TOOL_NAMES), (
@@ -168,6 +171,23 @@ def _check_expect(kind: str, params: dict) -> tuple[bool, str]:
             ctypes.windll.kernel32.CloseHandle(handle)
             return False, f"процесс {pid} ещё существует"
         return True, f"процесса {pid} нет"
+    if kind == "no_files_in":
+        directory = params.get("dir", "")
+        if not directory:
+            return False, "no_files_in без dir"
+        try:
+            files = [p.name for p in Path(directory).iterdir() if p.is_file()]
+        except OSError as exc:
+            return False, f"папка {directory!r} недоступна: {exc}"
+        return not files, (f"остались файлы: {files[:5]}" if files else "папка пуста")
+    if kind == "paths_gone":
+        import os as _os
+
+        paths = params.get("paths") or []
+        if not paths:
+            return False, "paths_gone без paths"
+        alive = [p for p in paths if _os.path.exists(p)]
+        return not alive, (f"ещё существуют: {alive[:5]}" if alive else "все пути исчезли")
     return False, f"runner не поддерживает kind {kind!r}"
 
 

@@ -19,7 +19,8 @@ from ..mcp_server import TOOL_NAMES
 
 EXPECT_KINDS = {
     "element_exists", "text_contains", "file_contains",
-    "window_open", "process_gone", "scenario_passed"}
+    "window_open", "process_gone", "scenario_passed",
+    "no_files_in", "paths_gone"}
 
 
 class Expect(BaseModel):

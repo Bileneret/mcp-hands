@@ -53,13 +53,26 @@ def test_runner_writes_steps_and_incidents_to_memory(memory, tmp_path):
 
 def test_suite_dry_llm_records_all_selected_tasks(tmp_path):
     """Сьюта на непокрытых задачах: честный missing_tools по именам, без имитации."""
-    summary = run_suite(task_ids=["b01", "b08"], db_path=tmp_path / "m.db")
+    summary = run_suite(task_ids=["b01", "b09"], db_path=tmp_path / "m.db")
     assert summary["mode"].startswith("scripted")
     by_id = {row["task_id"]: row for row in summary["tasks"]}
     assert by_id["b01"]["status"] == "missing_tools"
     assert "word_report_from_template" in by_id["b01"]["reason"]
-    assert "fs_trash_move" in by_id["b08"]["reason"]
+    assert "excel_workbook_build" in by_id["b09"]["reason"]
     assert summary["passed"] == 0 and summary["missing_tools"] == 2
+
+
+def test_suite_b08_stand_passes_or_skips_without_recycle_bin(tmp_path):
+    """Задача b08 через стенд: сортировка по типам + корзина.
+    Если в среде недоступна корзина, шаг корзины честно провалится — тогда скип
+    с причиной (это ограничение среды, а не кода)."""
+    summary = run_suite(task_ids=["b08"], db_path=tmp_path / "m.db")
+    row = summary["tasks"][0]
+    if row["status"] != "passed" and "корзин" not in (row.get("reason") or "").lower():
+        assert row["status"] == "passed", row
+    if row["status"] != "passed":
+        pytest.skip(f"корзина недоступна: {row.get('reason')}")
+    assert row["steps"] == 2, row
 
 
 @pytest.mark.office

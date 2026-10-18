@@ -41,7 +41,8 @@ LOG_PATH = Path(__file__).resolve().parents[1] / "logs" / "mcp_calls.log"
 TOOL_NAMES = frozenset({
     "windows_list", "element_find", "element_text", "content_map", "ocr_window",
     "window_activate", "click_node", "type_text", "hotkey",
-    "notepad_run", "word_pdf_run", "browser_links_run", "health"})
+    "notepad_run", "word_pdf_run", "browser_links_run", "health",
+    "fs_trash_move", "fs_sort_by_type"})
 
 server = MCPServer(
     name="mcp-hands",
@@ -509,6 +510,82 @@ def word_pdf_run() -> ToolResult:
 def browser_links_run() -> ToolResult:
     """Сценарий браузера целиком: headless Edge + CDP → собрать ссылки → проверить файл."""
     return _run_domain("browser_links_run", "browser_links")
+
+
+# --- файлы (колонна B: политика «только корзина») -------------------------------
+
+
+@server.tool(structured_output=True)
+def fs_trash_move(paths: list[str], dry_run: bool = False) -> ToolResult:
+    """Перемещает файлы/папки в КОРЗИНУ (`SHFileOperation` + `FOF_ALLOWUNDO`).
+
+    Полного удаления в наборе не существует. Запрещены системные области
+    (SystemRoot, Program Files, ProgramData, корни дисков) — отказ до действий.
+    `dry_run=True` — только проверка политики и существования, без изменений.
+    """
+    started = time.perf_counter()
+    if not paths:
+        return _fail("fs_trash_move", started, "пустой список путей", True)
+    from .files import FilesPolicyError, trash
+
+    try:
+        if dry_run:
+            from pathlib import Path as _Path
+
+            from .files import ensure_allowed
+
+            checked = []
+            for item in paths:
+                try:
+                    resolved = ensure_allowed(item)
+                except FilesPolicyError as exc:
+                    return _fail("fs_trash_move", started, str(exc), True)
+                checked.append({"path": str(resolved), "exists": resolved.exists()})
+            result = ToolResult(ok=all(c["exists"] for c in checked), refused=False,
+                                summary=f"сухой прогон: в корзину ушли бы {len(checked)} путей",
+                                detail={"dry_run": True, "checked": checked})
+            _journal("fs_trash_move", started, result, {"count": len(paths), "dry_run": True})
+            return result
+        outcome = trash(paths)
+    except FilesPolicyError as exc:
+        return _fail("fs_trash_move", started, str(exc), True)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("fs_trash_move", started, f"{type(exc).__name__}: {exc}")
+    result = ToolResult(ok=bool(outcome.get("ok")), refused=False,
+                        reason=outcome.get("reason", ""),
+                        summary=f"в корзину отправлено: {len(outcome.get('trashed', []))} "
+                                f"(предупреждений: {len(outcome.get('warnings', []))})",
+                        detail=outcome)
+    _journal("fs_trash_move", started, result, {"count": len(paths)})
+    return result
+
+
+@server.tool(structured_output=True)
+def fs_sort_by_type(source: str, target_root: str, dry_run: bool = False) -> ToolResult:
+    """Разбор папки по типам: файлы верхнего уровня раскладываются по категориям
+    (документы/изображения/архивы/аудио/видео/прочее) в подпапки цели.
+
+    Никаких перезаписей: совпадение имён разрешается суффиксом. `dry_run` —
+    план перемещений без единого изменения. Постусловие боевого прогона:
+    в источнике не осталось файлов.
+    """
+    started = time.perf_counter()
+    from .files import FilesPolicyError, sort_by_type
+
+    try:
+        outcome = sort_by_type(source, target_root, dry_run=dry_run)
+    except FilesPolicyError as exc:
+        return _fail("fs_sort_by_type", started, str(exc), True)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("fs_sort_by_type", started, f"{type(exc).__name__}: {exc}")
+    result = ToolResult(ok=bool(outcome.get("ok")), refused=False,
+                        reason=outcome.get("reason", ""),
+                        summary=(f"сухой прогон: к перемещению {outcome.get('count', 0)} файлов"
+                                 if dry_run else
+                                 f"перемещено {len(outcome.get('moved', []))} файлов"),
+                        detail=outcome)
+    _journal("fs_sort_by_type", started, result, {"source": source, "dry_run": dry_run})
+    return result
 
 
 # --- служебные ---------------------------------------------------------------------
