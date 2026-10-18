@@ -172,7 +172,7 @@ def _check_expect(kind: str, params: dict) -> tuple[bool, str]:
 
 
 def run_plan(plan: Plan, limits: RunnerLimits | None = None,
-             llm_request_plan=None) -> PlanRun:
+             llm_request_plan=None, memory=None, plan_source: str = "scripted") -> PlanRun:
     """Исполняет план по шагам (замкнутый цикл).
 
     `llm_request_plan(plan, failed_outcome) -> Plan | None` — необязательный
@@ -181,6 +181,9 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
     заменяет план целиком и продолжает с его первого шага); None или исключение
     = перепланирование сорвалось — прогон завершается честной причиной.
 
+    `memory` — `mcp_hands.memory.Memory`: тогда каждый шаг (включая провальные),
+    инциденты стража и итог прогона попадают в SQLite (провалы не прячутся).
+
     Каждый шаг: попытки (бюджет `attempts_per_step`), попытка = вызов инструмента
     (фильтр args) →ToolResult.ok → проверка `expect` против реального мира.
     Отказ стража (`refused`) повторами не лечится — завершение шага сразу.
@@ -188,6 +191,7 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
     limits = limits or RunnerLimits()
     run = PlanRun(task_id=plan.task_id)
     started = time.perf_counter()
+    run_id = memory.start_run(plan.task_id, plan_source) if memory is not None else None
     position = 0
     while position < len(plan.steps):
         step = plan.steps[position]
@@ -215,6 +219,9 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
                 outcome.reason = (result.reason if isinstance(result, ToolResult)
                                   else f"{type(result).__name__}: неожиданный возврат")
                 if isinstance(result, ToolResult) and result.refused:
+                    if memory is not None:
+                        memory.record_incident(run_id, "guard_refused", step.action,
+                                               outcome.reason)
                     break  # отказ стража повторами не лечится — это не случайный сбой
                 continue  # временный сбой: повтор по бюджету
             # действие вернуло ok: проверяем объявленную постусловие
@@ -231,12 +238,18 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
             outcome.reason = f"постусловие {step.expect.kind} не наступило: {evidence}"
         outcome.ms = (time.perf_counter() - step_started) * 1000.0
         run.steps.append(outcome)
+        if memory is not None:
+            memory.record_step(run_id, outcome)
+            if not outcome.ok and (outcome.reason or "").startswith("постусловие"):
+                memory.record_incident(run_id, "expect_failed", step.action, outcome.reason)
         if outcome.ok:
             position += 1
             continue
         # шаг не удался: перепланирование только при живом LLM и в лимитах задачи
         if llm_request_plan is None or run.replans >= limits.max_task_replans:
             run.reason = outcome.reason or f"шаг {position + 1} не прошёл"
+            if memory is not None and llm_request_plan is not None:
+                memory.record_incident(run_id, "replan_stop", step.action, run.reason)
             break
         run.replans += 1
         regenerated = llm_request_plan(plan, outcome)
@@ -256,6 +269,10 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
         and all(step.ok for step in final_tail)
     if not run.ok and not run.reason:
         run.reason = "не все шаги плана прошли"
+    if memory is not None:
+        memory.finish_run(run_id, status="passed" if run.ok else "failed", ok=run.ok,
+                          reason=run.reason, total_ms=run.total_ms, replans=run.replans,
+                          cumulative_tokens=run.cumulative_tokens)
     return run
 
 
