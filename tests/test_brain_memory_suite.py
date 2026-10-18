@@ -75,7 +75,8 @@ def test_suite_b08_stand_passes_or_skips_without_recycle_bin(tmp_path):
     """Задача b08 через стенд: сортировка по типам + корзина.
     Если в среде недоступна корзина, шаг корзины честно провалится — тогда скип
     с причиной (это ограничение среды, а не кода)."""
-    summary = run_suite(task_ids=["b08"], db_path=tmp_path / "m.db")
+    summary = run_suite(task_ids=["b08"], db_path=tmp_path / "m.db",
+                     artifacts_dir=tmp_path / "bench")
     row = summary["tasks"][0]
     if row["status"] != "passed" and "корзин" not in (row.get("reason") or "").lower():
         assert row["status"] == "passed", row
@@ -88,7 +89,8 @@ def test_suite_b08_stand_passes_or_skips_without_recycle_bin(tmp_path):
 def test_suite_b03_scripted_passes(tmp_path):
     """Покрытая задача b03 в режиме --dry-llm: план → Word→PDF → вердикт passed,
     метрики записаны (живой прогон, Word поднимается и закрывается штатно)."""
-    summary = run_suite(task_ids=["b03"], db_path=tmp_path / "m.db")
+    summary = run_suite(task_ids=["b03"], db_path=tmp_path / "m.db",
+                     artifacts_dir=tmp_path / "bench")
     assert summary["passed"] == 1 and summary["failed"] == 0, summary
     row = summary["tasks"][0]
     assert row["status"] == "passed" and row["steps"] == 1
@@ -103,7 +105,8 @@ def test_suite_b01_b02_stands_pass(tmp_path):
     b02 — форматирование (заголовки-стили, шрифт, интервалы, оглавление).
     Оба инструмента проверяют себя перечитыванием свойств документа
     (OutlineLevel/InUse), поэтому вердикт passed — не «вызов не упал»."""
-    summary = run_suite(task_ids=["b01", "b02"], db_path=tmp_path / "m.db")
+    summary = run_suite(task_ids=["b01", "b02"], db_path=tmp_path / "m.db",
+                     artifacts_dir=tmp_path / "bench")
     by_id = {row["task_id"]: row for row in summary["tasks"]}
     assert by_id["b01"]["status"] == "passed", by_id["b01"]
     assert by_id["b02"]["status"] == "passed", by_id["b02"]
@@ -114,7 +117,8 @@ def test_suite_b01_b02_stands_pass(tmp_path):
 def test_suite_b09_stand_passes(tmp_path):
     """Excel-стенд b09: два CSV → книга со сводом и диаграммой; инструмент
     подтверждает результат сверкой С ДИСКА (закрыть→открыть→сличить ячейки)."""
-    summary = run_suite(task_ids=["b09"], db_path=tmp_path / "m.db")
+    summary = run_suite(task_ids=["b09"], db_path=tmp_path / "m.db",
+                     artifacts_dir=tmp_path / "bench")
     row = summary["tasks"][0]
     assert row["status"] == "passed", row
     assert summary["failed"] == 0, summary
@@ -129,7 +133,8 @@ def test_suite_browser_stands_pass(tmp_path):
 
     if not edge_path():
         pytest.skip("не найден msedge.exe — браузерные стенды недоступны в этой среде")
-    summary = run_suite(task_ids=["b06", "b04", "b07"], db_path=tmp_path / "m.db")
+    summary = run_suite(task_ids=["b06", "b04", "b07"], db_path=tmp_path / "m.db",
+                     artifacts_dir=tmp_path / "bench")
     by_id = {row["task_id"]: row for row in summary["tasks"]}
     for task in ("b06", "b04", "b07"):
         assert by_id[task]["status"] == "passed", by_id[task]

@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import time
 from pathlib import Path
@@ -20,6 +21,31 @@ from pathlib import Path
 BENCH_DIR = Path(__file__).resolve().parents[2] / "logs" / "benchmark"
 DB = Path(__file__).resolve().parents[2] / "logs" / "agent_memory.db"
 BASELINE = Path(__file__).resolve().parents[2] / "docs" / "HUMAN_BASELINE.md"
+
+# Имя сценария рядом с кодом задачи — рекомендация аудита v22 (для витрины)
+TASK_LABELS = {
+    "b01": "Word: титульный лист + структура по шаблону",
+    "b02": "Word: форматирование (стили, оглавление)",
+    "b03": "Word → PDF",
+    "b04": "Браузер: источники в таблицу",
+    "b05": "Браузер: статья → Word с цитатой",
+    "b06": "Браузер: разбор сессии вкладок",
+    "b07": "Медиа: скорость + таймкоды в заметки",
+    "b08": "Файлы: разбор загрузок (корзина)",
+    "b09": "Excel: свод CSV + диаграмма",
+    "b10": "Комбо: поиск → таблица → оформление → PDF",
+}
+
+GUARANTEES = ("**Архитектурные гарантии:** Guarded Input (клавиатура — только в "
+              "проверенно активное окно; отказы стражей повторами не лечатся) · "
+              "Zero-Trust Artifacts (L1-перечитывание свойств + L2-инспектор без COM) · "
+              "Transactional Steps (чекпойнты и откат файлов с SHA-256) · "
+              "Safety by Omission (нет инструментов удаления/оплаты/публикации; "
+              "удаление — только в корзину) · Desktop Isolation (сателлит на столе "
+              "ввода, окна пользователя не трогаются)")
+
+# Таймкод вида 4:07.26 / 0:44 / 1:26,82 — из ячейки владельца
+TIME_CODE = re.compile(r"(\d+)\s*:\s*(\d{1,2}(?:[.,]\d+)?)")
 
 
 def _latest(mode: str, bench_dir: Path = BENCH_DIR) -> Path | None:
@@ -34,22 +60,35 @@ def _latest(mode: str, bench_dir: Path = BENCH_DIR) -> Path | None:
     return sorted(candidates)[-1][1] if candidates else None
 
 
-def _human_total_seconds(baseline: Path = BASELINE) -> float | None:
-    """Сумма замеров владельца из чек-листа (строки `| b01 | … | 1:45 |`)."""
+def _human_measurements(baseline: Path = BASELINE) -> dict[str, dict]:
+    """Замеры владельца из чек-листа: {b01: {"seconds": 247.26, "note": "…"}}.
+
+    Таймкод извлекается из последней ячейки строки-задачи; всё, что после него,
+    сохраняется как примечание владельца (например, «видео фактически не было»).
+    Ячейка без таймкода (отказ от замера) остаётся с seconds=None и своим текстом.
+    """
     if not baseline.exists():
-        return None
-    total = 0.0
-    found = False
+        return {}
+    rows: dict[str, dict] = {}
     for line in baseline.read_text(encoding="utf-8").splitlines():
         cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
-        if len(cells) >= 3 and cells[0].startswith("b") and ":" in cells[-1]:
-            minutes, _, seconds = cells[-1].partition(":")
-            try:
-                total += int(minutes) * 60 + int(seconds)
-                found = True
-            except ValueError:
-                continue
-    return total if found else None
+        if len(cells) < 3 or not re.fullmatch(r"b\d{2}", cells[0]):
+            continue
+        match = TIME_CODE.search(cells[-1])
+        if match:
+            seconds = int(match.group(1)) * 60 + float(match.group(2).replace(",", "."))
+            note = cells[-1][match.end():].strip(" -–—\t")
+            rows[cells[0]] = {"seconds": seconds, "note": note}
+        else:
+            rows[cells[0]] = {"seconds": None, "note": cells[-1].strip()}
+    return rows
+
+
+def _human_total_seconds(baseline: Path = BASELINE) -> float | None:
+    """Сумма там, где таймкоды есть (сохранено для совместимости сводок)."""
+    measured = [row["seconds"] for row in _human_measurements(baseline).values()
+                if row["seconds"] is not None]
+    return sum(measured) if measured else None
 
 
 def build_summary(out_path: Path | None = None, bench_dir: Path = BENCH_DIR,
@@ -77,15 +116,19 @@ def build_summary(out_path: Path | None = None, bench_dir: Path = BENCH_DIR,
             stat = per_task[tid]
             passed = f"{stat.get('passed', 0)}/{stat.get('runs', 0)}"
             avg = stat.get("avg_ms")
-            entry = (f"| {tid} | {passed} | "
+            label = TASK_LABELS.get(tid, tid)
+            name = f"{tid} — {label}"
+            entry = (f"| {name} | {passed} | "
                      f"{avg / 1000:.2f} | {stat.get('min_ms', 0) / 1000:.2f} | "
                      f"{stat.get('max_ms', 0) / 1000:.2f} |") if avg else \
-                    f"| {tid} | {passed} | — | — | — |"
+                    f"| {name} | {passed} | — | — | — |"
             lines.append(entry)
             if avg:
                 avg_total += avg / 1000
         lines.append(f"| **Итого** | **{scripted.get('passed')}/{len(per_task) * rounds}** | "
-                     f"**{avg_total:.1f}** | — | — |\n")
+                     f"**{avg_total:.1f}** (за круг — "
+                     f"**{avg_total / max(1, rounds):.1f}**) | — | — |\n")
+        lines.append(GUARANTEES + "\n")
     else:
         lines.append("_Net scripted-серии в logs/benchmark — запусти сьюту._\n")
 
@@ -119,13 +162,39 @@ def build_summary(out_path: Path | None = None, bench_dir: Path = BENCH_DIR,
                      if rate is not None else "- прогонов нет\n")
         lines.append(f"- инциденты: {json.dumps(incidents, ensure_ascii=False)}\n")
 
-    human_total = _human_total_seconds(baseline)
+    humans = _human_measurements(baseline)
     lines.append("## Сравнение с человеком (DESIGN §7)\n")
-    if scripted.get("total_ms") and human_total:
-        agent_seconds = scripted["total_ms"] / 1000 / max(1, scripted.get("rounds", 1))
-        lines.append(f"- агент (один круг десяти задач): ~**{agent_seconds:.0f} с**\n"
-                     f"- человек (чек-лист владельца): **{human_total:.0f} с**\n"
-                     f"- коэффициент ускорения: **×{human_total / agent_seconds:.1f}**\n")
+    measured = {tid: row for tid, row in humans.items() if row["seconds"] is not None}
+    if measured and per_task:
+        lines.append("_Замеры владельца по чек-листу; коэффициент — по задачам, "
+                     "где есть оба времени (агент и человек):_\n")
+        lines.append("| Задача | Агент, с | Человек | × |")
+        lines.append("|---|---|---|---|")
+        agent_sum = 0.0
+        human_sum = 0.0
+        for tid in sorted(measured):
+            agent_ms = (per_task.get(tid) or {}).get("avg_ms")
+            if not agent_ms:
+                continue
+            agent_seconds = agent_ms / 1000
+            human_seconds = measured[tid]["seconds"]
+            agent_sum += agent_seconds
+            human_sum += human_seconds
+            minutes, seconds = divmod(human_seconds, 60)
+            lines.append(f"| {tid} — {TASK_LABELS.get(tid, '')} | {agent_seconds:.2f} | "
+                         f"{int(minutes)}:{seconds:05.2f} | ×{human_seconds / agent_seconds:.1f} |")
+        if agent_sum:
+            lines.append(f"| **Итого (сопоставленные задачи)** | **{agent_sum:.1f}** | "
+                         f"**{human_sum:.0f} с** | **×{human_sum / agent_sum:.1f}** |\n")
+        notes = [(tid, row["note"]) for tid, row in humans.items() if row["note"]]
+        if notes:
+            lines.append("Примечания владельца к замерам:\n")
+            for tid, note in sorted(notes):
+                lines.append(f"- **{tid}**: {note}\n")
+        unmeasured = [tid for tid, row in humans.items() if row["seconds"] is None]
+        if unmeasured:
+            lines.append(f"- не замерены: **{', '.join(sorted(unmeasured))}** — "
+                         "в коэффициент не входят (оценки не подставляются)\n")
     else:
         lines.append("- замер человека **ожидает владельца**: методика и чек-лист — "
                      "`docs/HUMAN_BASELINE.md` (заполняются два столбца времени, "

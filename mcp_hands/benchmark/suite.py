@@ -372,18 +372,22 @@ def _live_replan(config, memory: Memory, task):
 def run_suite(task_ids: list[str] | None = None, live: bool = False,
               db_path: Path | str = DEFAULT_DB,
               limits: RunnerLimits | None = None, rounds: int = 1,
-              hardening: bool = True) -> dict:
+              hardening: bool = True,
+              artifacts_dir: Path | str | None = None) -> dict:
     """Прогоняет выбранные задачи (по умолчанию все 10) и пишет метрики в память.
 
     `rounds` — повторы задачи (приёмка этапа 4: ≥3 кругов для порога автономности).
     `hardening` — включить контур этапа 4: L2-инспектор (`verifier`) и чекпойнты.
+    `artifacts_dir` — куда писать стенды/отчёты; по умолчанию logs/benchmark,
+    тесты обязаны передавать свой tmp-каталог, чтобы не засорять прод-журнал.
     Сводка несёт `autonomy` (прогоны без вмешательств человека — DESIGN §7).
     """
+    artifacts_root = Path(artifacts_dir) if artifacts_dir else ARTIFACTS
     memory = Memory(db_path)
     started = time.perf_counter()
     rows: list[dict] = []
     verifier = inspect_artifact if hardening else None
-    checkpoints = CheckpointStore(ARTIFACTS.parent / "checkpoints") if hardening else None
+    checkpoints = CheckpointStore(artifacts_root.parent / "checkpoints") if hardening else None
     config = None
     if live:
         from ..brain.llm import load_config
@@ -396,7 +400,7 @@ def run_suite(task_ids: list[str] | None = None, live: bool = False,
                 continue
             if task.id in STANDS:
                 stamp = time.strftime("%Y%m%d_%H%M%S")
-                stand_workdir = ARTIFACTS / "stands" / task.id / f"{stamp}_r{round_index}"
+                stand_workdir = artifacts_root / "stands" / task.id / f"{stamp}_r{round_index}"
                 stand_workdir.mkdir(parents=True, exist_ok=True)
                 prepared = STANDS[task.id](stand_workdir)
                 plan = parse_plan(prepared["plan"])
@@ -458,8 +462,8 @@ def run_suite(task_ids: list[str] | None = None, live: bool = False,
                    "total_ms": round((time.perf_counter() - started) * 1000.0, 1),
                    "metrics": memory.metrics()}
         memory.close()
-    ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    path = ARTIFACTS / f"suite_{time.strftime('%Y%m%d_%H%M%S')}.json"
+    artifacts_root.mkdir(parents=True, exist_ok=True)
+    path = artifacts_root / f"suite_{time.strftime('%Y%m%d_%H%M%S')}.json"
     path.write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding="utf-8")
     summary["report"] = str(path)
     return summary

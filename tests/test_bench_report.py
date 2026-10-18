@@ -40,10 +40,11 @@ def test_summary_builds_matrix_and_multiplier(tmp_path):
                         baseline=baseline)
     text = out.read_text(encoding="utf-8")
     assert "30" in text or "6/6" in text  # результаты серии
-    assert "| b01 | 3/3 | 5.00 | 4.80 | 5.20 |" in text, text
+    assert "b01 — Word: титульный лист + структура по шаблону | 3/3 | 5.00 | 4.80 | 5.20 |" in text, text
     assert "GLM-5.3-Flash" in text and "1452" in text  # живой контур
-    # человек: 1:45 + 0:20 = 125 с; агентский круг = 60 с / 3 круга = 20 с → ×6.2
-    assert "125 с" in text and "×6.2" in text, text
+    # человек: b01=105 с, b08=20 с → 125 с; агент по тем же задачам 5.3 с → ×23.6
+    assert "125 с" in text and "×23.6" in text, text
+    assert "Архитектурные гарантии:" in text, text
 
 
 def test_summary_without_measurements_is_honest(tmp_path):
