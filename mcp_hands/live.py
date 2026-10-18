@@ -120,6 +120,66 @@ class LiveBrowser:
         return {"ok": True, "mode": "user", "port": port,
                 "browser": version.get("Browser", "")}
 
+    def tabs(self) -> list[dict]:
+        """Вкладки живой сессии: id, заголовок, адрес и наша ли это вкладка.
+
+        Ничего не открывает и не закрывает — только читает список, чтобы цель могла
+        решить: работать в своей вкладке, в текущей вкладке владельца или открыть новую.
+        """
+        cdp = self._cdp()
+        pages = [tab for tab in self._endpoint("/json/list") if tab.get("type") == "page"]
+        mine = (self.tab or {}).get("id", "")
+        return [{"id": str(tab.get("id", "")), "title": str(tab.get("title", ""))[:80],
+                 "url": str(tab.get("url", ""))[:120], "ours": tab.get("id") == mine}
+                for tab in pages]
+
+    def tabs_summary(self) -> dict:
+        """Краткая сводка для `observe`: сколько вкладок и что в нашей рабочей."""
+        try:
+            rows = self.tabs()
+        except Exception as exc:  # noqa: BLE001 — состояние сессии может быть любым
+            return {"tabs_count": 0, "note": f"список вкладок недоступен: {type(exc).__name__}"}
+        ours = next((row for row in rows if row["ours"]), {})
+        return {"tabs_count": len(rows), "active_tab_title": ours.get("title", ""),
+                "active_tab_url": ours.get("url", "")}
+
+    def attach_tab(self, tab_id: str = "", title_substring: str = "") -> dict:
+        """Работаем в УКАЗАННОЙ вкладке владельца: не закрываем, не переставляем, не навигируем.
+
+        Решение владельца 19.10: в его браузере работать можно, но осознанно — по цели.
+        Пустые `tab_id`/`title_substring` означают «первая вкладка списка» (обычно
+        текущая); факт фокуса проверяется отдельно и докладывается честно, а не
+        выдаётся за уверенность.
+        """
+        cdp = self._cdp()
+        pages = [tab for tab in self._endpoint("/json/list") if tab.get("type") == "page"]
+        if not pages:
+            raise CdpTransportError("обрыв связи: в браузере нет вкладок для работы")
+        picked = None
+        if tab_id:
+            picked = next((tab for tab in pages if str(tab.get("id", "")) == tab_id), None)
+            if picked is None:
+                return {"ok": False, "reason": f"вкладки {tab_id!r} нет: список изменился"}
+        elif title_substring:
+            needle = title_substring.lower()
+            hits = [tab for tab in pages if needle in str(tab.get("title", "")).lower()
+                    or needle in str(tab.get("url", "")).lower()]
+            if not hits:
+                return {"ok": False, "reason": f"вкладки с {title_substring!r} в заголовке/адресе нет"}
+            if len(hits) > 1:
+                return {"ok": False, "reason": (f"под {title_substring!r} подходит "
+                                                f"{len(hits)} вкладок: уточни запрос")}
+            picked = hits[0]
+        else:
+            picked = pages[0]
+        self.tab = picked
+        cdp.connect(picked["webSocketDebuggerUrl"])
+        focused = bool(self.evaluate("document.hasFocus()"))
+        return {"ok": True, "tab": str(picked.get("id", ""))[:12],
+                "title": str(picked.get("title", ""))[:80],
+                "url": str(picked.get("url", ""))[:120], "focused": focused,
+                "note": "" if focused else "вкладка не в фокусе: клики лучше через DOM"}
+
     def stop(self) -> dict:
         """Закрывает ТОЛЬКО наш экземпляр; в user-режиме — просто отключается."""
         if self.cdp is not None:
@@ -231,17 +291,27 @@ class LiveBrowser:
                 self.ensure_tab()
         return cdp
 
-    def ensure_tab(self) -> dict:
-        """Первая вкладка типа page (или единственная) как рабочая точка."""
+    def ensure_tab(self, attempts: int = 10) -> dict:
+        """Первая вкладка типа page как рабочая точка; пустой список — не тупик.
+
+        Свежий браузер отвечает на /json/version раньше, чем создаёт первую вкладку,
+        поэтому список опрашивается с паузами, а если вкладок так и нет — открываем
+        СВОЮ пустую (это наша вкладка: вкладок владельца не касаемся).
+        """
         cdp = self._cdp()
-        pages = [tab for tab in self._endpoint("/json/list")
-                 if tab.get("type") == "page"]
+        pages: list[dict] = []
+        for attempt in range(max(1, attempts)):
+            pages = [tab for tab in self._endpoint("/json/list") if tab.get("type") == "page"]
+            if pages:
+                break
+            time.sleep(0.3)
         if not pages:
-            raise CdpTransportError("обрыв связи: в браузере нет открытых вкладок")
+            pages = [self._open_page("about:blank")]
         self.tab = pages[0]
         self._connect_tab(self.tab)
         cdp.call("Page.enable")
-        return {"tab": self.tab.get("id", "")[:12], "url": self.tab.get("url", "")}
+        return {"tab": self.tab.get("id", "")[:12], "url": self.tab.get("url", ""),
+                "opened": len(pages) == 1 and not pages[0].get("title")}
 
     def evaluate(self, expression: str):
         result = self._call("Runtime.evaluate", expression=expression, returnByValue=True)

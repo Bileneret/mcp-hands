@@ -52,6 +52,27 @@ EXPECT_SAY = {
 }
 
 
+#: Служебный шум, который TTS зачитывает как техническую пунктуацию: windows-пути
+#: и JSON-фрагменты. Замечание аудита v25: голосовой отчёт должен звучать по-человечески.
+_PATH_NOISE = re.compile(r"[A-Za-z]:\\[^\s,;]+")
+
+
+def speakable(text: str, limit: int = 170) -> str:
+    """Чистит строку для произнесения: без фигурных скобок, путей и лишних знаков.
+
+    Скобки вырезаются от первой открывающей до последней закрывающей — вложенный JSON
+    целиком, а не по кускам: иначе в речь попадал мусор вида `{"detail": }`.
+    """
+    clean = str(text)
+    while "{" in clean and "}" in clean:
+        start, end = clean.find("{"), clean.rfind("}")
+        clean = clean[:start] + " " + clean[end + 1:] if end > start else \
+            clean.replace("{", " ").replace("}", " ")
+    clean = _PATH_NOISE.sub(" ", clean)
+    clean = re.sub(r"\s+", " ", clean).strip(" .,;:—-\"'")
+    return clean[:limit]
+
+
 def normalize_goal(text: str) -> str:
     """Ключ рецепта: регистр, знаки и двойные пробелы не должны мешать совпадению."""
     lowered = re.sub(r"[^\w\s]", " ", text.lower())
@@ -73,37 +94,50 @@ class RecipeStore:
             connection.execute(
                 "CREATE TABLE IF NOT EXISTS recipes ("
                 " goal TEXT PRIMARY KEY, plan TEXT NOT NULL, uses INTEGER DEFAULT 0,"
-                " ok INTEGER DEFAULT 0, updated REAL)")
+                " ok INTEGER DEFAULT 0, updated REAL, fingerprint TEXT DEFAULT '')")
+            columns = {row["name"] for row in
+                       connection.execute("PRAGMA table_info(recipes)").fetchall()}
+            if "fingerprint" not in columns:  # миграция старых баз
+                connection.execute("ALTER TABLE recipes ADD COLUMN fingerprint TEXT DEFAULT ''")
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=10)
         connection.row_factory = sqlite3.Row
         return connection
 
-    def get(self, goal: str) -> Plan | None:
+    def get(self, goal: str) -> tuple[Plan, dict] | None:
+        """Рецепт вместе с отпечатком обстановки, при которой он сработал."""
         with self._connect() as connection:
-            row = connection.execute("SELECT plan FROM recipes WHERE goal = ?",
-                                     (normalize_goal(goal),)).fetchone()
+            row = connection.execute(
+                "SELECT plan, fingerprint FROM recipes WHERE goal = ?",
+                (normalize_goal(goal),)).fetchone()
         if row is None:
             return None
         try:
-            return Plan.model_validate(json.loads(row["plan"]))
+            plan = Plan.model_validate(json.loads(row["plan"]))
         except Exception:  # noqa: BLE001 — испорченный рецепт не должен ломать цель
             return None
+        try:
+            fingerprint = json.loads(row["fingerprint"] or "{}")
+        except json.JSONDecodeError:
+            fingerprint = {}
+        return plan, (fingerprint if isinstance(fingerprint, dict) else {})
 
     def note_use(self, goal: str) -> None:
         with self._connect() as connection:
             connection.execute("UPDATE recipes SET uses = uses + 1 WHERE goal = ?",
                                (normalize_goal(goal),))
 
-    def save(self, goal: str, plan: Plan) -> None:
+    def save(self, goal: str, plan: Plan, fingerprint: dict | None = None) -> None:
         payload = json.dumps(plan.model_dump(), ensure_ascii=False)
+        stamp = json.dumps(fingerprint or {}, ensure_ascii=False)
         with self._connect() as connection:
             connection.execute(
-                "INSERT INTO recipes (goal, plan, uses, ok, updated) VALUES (?, ?, 0, 1, ?)"
+                "INSERT INTO recipes (goal, plan, uses, ok, updated, fingerprint)"
+                " VALUES (?, ?, 0, 1, ?, ?)"
                 " ON CONFLICT(goal) DO UPDATE SET plan = excluded.plan,"
-                " ok = 1, updated = excluded.updated",
-                (normalize_goal(goal), payload, time.time()))
+                " ok = 1, updated = excluded.updated, fingerprint = excluded.fingerprint",
+                (normalize_goal(goal), payload, time.time(), stamp))
 
     def drop(self, goal: str) -> None:
         """Рецепт не сработал — забываем его, чтобы не повторять ошибку."""
@@ -149,13 +183,30 @@ class GoalRunner:
         self._log("observe", summary=result.summary[:160])
         return {"summary": result.summary, "facts": facts}
 
+    @staticmethod
+    def fingerprint(facts: dict) -> dict:
+        """Отпечаток обстановки: окно и режим браузера, при которых цель решалась.
+
+        Нужен, чтобы рецепт не срабатывал «в чужом окне» и не удалялся из-за этого
+        (замечание аудита v25): при несовпадении отпечатка просто планируем заново.
+        """
+        active = (facts or {}).get("active") or {}
+        browser = (facts or {}).get("browser") or {}
+        return {"exe": str(active.get("exe", ""))[:40],
+                "browser": str(browser.get("mode", ""))}
+
     def make_plan(self, goal: str, facts: dict) -> tuple[Plan | None, str]:
-        """План под цель: сначала рецепт, затем модель (со срезом обстановки)."""
+        """План под цель: сначала рецепт (если обстановка совпала), затем модель."""
+        current = self.fingerprint(facts)
         known = self.recipes.get(goal)
         if known is not None:
-            self.recipes.note_use(goal)
-            self._log("recipe_hit", goal=goal[:120], steps=len(known.steps))
-            return known, "recipe"
+            plan, stamp = known
+            if not stamp or all(stamp.get(key) in ("", None, current.get(key))
+                                for key in ("exe", "browser")):
+                self.recipes.note_use(goal)
+                self._log("recipe_hit", goal=goal[:120], steps=len(plan.steps))
+                return plan, "recipe"
+            self._log("recipe_skip", goal=goal[:120], was=stamp, now=current)
         note = self._facts_note(facts)
         request = self.planner(self.config, task_id=f"goal-{abs(hash(goal)) % 100000}",
                                title=goal, needs=[], note=note)
@@ -195,6 +246,9 @@ class GoalRunner:
             say = f"Не смог построить план: {source[:120]}"
             return {"say": say, "ok": False, "detail": {"error": source, "source": "none"}}
 
+        # многошаговые цели (браузерная лестница) заслуживают второго переплана:
+        # замечание аудита v25 — у одной попытки слишком узкий бюджет для 3+ шагов
+        retries = 2 if len(plan.steps) >= 3 else planner_retries
         attempt = 0
         while True:
             attempt += 1
@@ -204,12 +258,12 @@ class GoalRunner:
             self._log("run", goal=goal[:120], source=source, ok=summary.get("ok"),
                       steps=len(plan.steps), seconds=round(time.perf_counter() - started, 1))
             if summary.get("ok"):
-                self.recipes.save(goal, plan)
+                self.recipes.save(goal, plan, self.fingerprint(facts["facts"]))
                 return {"say": self._say_ok(summary), "ok": True,
                         "detail": {"source": source, "steps": len(plan.steps),
                                    "seconds": round(time.perf_counter() - started, 1),
                                    "summary": summary}}
-            if attempt > planner_retries:
+            if attempt > retries:
                 if source == "recipe":
                     self.recipes.drop(goal)  # рецепт устарел: мир изменился
                 return {"say": self._say_fail(summary), "ok": False,
@@ -230,16 +284,16 @@ class GoalRunner:
         last = steps[-1] if steps else {}
         fact = EXPECT_SAY.get(str(last.get("expect", "")), "")
         base = f"Готово: шагов {len(done)} из {len(steps)}"
-        return f"{base}, {fact}." if fact else f"{base}."
+        return speakable(f"{base}, {fact}." if fact else f"{base}.")
 
     @staticmethod
     def _say_fail(summary: dict) -> str:
         """Отчёт о провале: где именно и почему (без «что-то пошло не так»)."""
         failed = next((step for step in (summary.get("steps") or [])
                        if not step.get("ok")), None)
-        reason = str(summary.get("reason", "") or "").strip()
+        reason = speakable(summary.get("reason", ""))
         if failed is None:
-            return f"Не получилось: {reason[:160] or 'причина не сообщена'}"
-        detail = reason or str(failed.get("reason", "") or "")[:160]
-        return (f"Не получилось на шаге {failed.get('index')} "
-                f"({failed.get('action')}): {detail or 'причина не сообщена'}")
+            return speakable(f"Не получилось: {reason or 'причина не сообщена'}")
+        detail = reason or speakable(str(failed.get("reason", "")))
+        return speakable(f"Не получилось на шаге {failed.get('index')} "
+                         f"({failed.get('action')}): {detail or 'причина не сообщена'}")

@@ -97,10 +97,12 @@ def test_recipe_store_roundtrip(tmp_path):
     store = RecipeStore(tmp_path / "recipes.db")
     assert store.count() == 0 and store.get("включи ютуб") is None
     plan = _plan()
-    store.save("Включи  YouTube!", plan)
+    store.save("Включи  YouTube!", plan, {"exe": "opera.exe", "browser": "work"})
     assert store.count() == 1
     loaded = store.get("включи youtube")          # нормализация не мешает совпадению
-    assert loaded is not None and len(loaded.steps) == 1
+    assert loaded is not None
+    plan_loaded, stamp = loaded
+    assert len(plan_loaded.steps) == 1 and stamp["exe"] == "opera.exe"
     store.note_use("включи youtube")
     store.drop("включи youtube")
     assert store.get("включи youtube") is None and store.count() == 0
@@ -261,7 +263,7 @@ def test_ocr_window_refuses_unknown_title():
     assert result.ok is False and result.refused is True
 
 
-def test_window_activate_by_title_finds_live_window(target):
+def test_window_activate_by_title_finds_live_window(target, require_input_desktop):
     """Живой прогон: окно называется заголовком — как это делает человек."""
     result = ms.window_activate(title_substring="pytest target")
     assert result.ok is True, result
@@ -301,3 +303,73 @@ def test_local_intents_still_win_over_goal_mode(text, tmp_path):
                                                           "matches": [{"rect": [1, 2, 3, 4]}]}}
     result = assistant.handle(text)
     assert result["kind"] == "local", result
+
+# --- Шаг 2: политика вкладок, пиксельный путь, прокрутка -----------------------
+
+
+def test_live_tabs_refuses_without_session():
+    """Без живой сессии инструмент отказывает внятно, а не молчит."""
+    result = ms.live_tabs()
+    assert result.ok is False and result.refused is True
+    assert "live_browser" in result.reason
+
+
+def test_click_text_on_screen_refuses_unknown_window():
+    """Пиксельный клик невозможен без окна: отказ с причиной, ничего не нажимаем."""
+    result = ms.click_text_on_screen("что-нибудь", title_substring="окна-нет-98765")
+    assert result.ok is False and result.refused is True
+    assert "не найдено" in result.reason
+
+
+def test_click_text_on_screen_refuses_when_text_absent(target):
+    """Нет текста — нет клика: координаты не выдумываются."""
+    result = ms.click_text_on_screen("текста-такого-нет-98765", hwnd=target.hwnd)
+    assert result.ok is False and result.refused is True
+    assert "не найден" in result.reason
+
+
+def test_scroll_refuses_without_window():
+    assert ms.scroll(clicks=3, title_substring="окна-нет-98765").refused is True
+    assert ms.scroll(clicks=0).refused is True
+
+
+def test_scroll_dry_run_does_not_touch_screen(target):
+    """Сухой прогон показывает точку и не отправляет ни одного события."""
+    result = ms.scroll(clicks=3, hwnd=target.hwnd, dry_run=True)
+    assert result.ok is True and result.detail["dry_run"] is True
+    assert result.detail["point"], result.detail
+
+
+def test_click_dry_run_reports_point_without_clicking(target):
+    """Сухой прогон пиксельного клика: точка показана, ввод не отправлен."""
+    result = ms.click_text_on_screen("beta", hwnd=target.hwnd, dry_run=True)
+    if not result.ok and result.refused and "не найден" in result.reason:
+        pytest.skip("OCR не распознал подпись кнопки в этом прогоне")
+    assert result.ok is True, result
+    assert result.detail["dry_run"] is True and result.detail["point"]
+    assert target.clicks() == [], "сухой прогон не должен нажимать"
+
+
+def test_speakable_strips_paths_and_json():
+    """Голосовой отчёт не зачитывает пути и JSON (замечание аудита v25)."""
+    from mcp_hands.assistant.goal import speakable
+
+    dirty = ("Не получилось на шаге 1 (ocr_find): причина не наступила "
+             '{"ok": true, "detail": {"lines": []}} и ' + r"C:\temp\файл.png")
+    clean = speakable(dirty)
+    assert "{" not in clean and "}" not in clean and "C:" not in clean, clean
+    assert clean.startswith("Не получилось на шаге 1")
+
+
+def test_recipe_fingerprint_skips_recipe_in_other_window(tmp_path):
+    """Рецепт чужого окна не применяем и НЕ удаляем: просто планируем заново."""
+    planner = FakePlanner([_plan()])
+    executor = FakeExecutor([_run(True)])
+    runner = _runner(tmp_path, planner, executor)
+    runner.recipes.save("проверь окно", _plan(),  # рецепт снят в другом окне
+                        {"exe": "sovsem_drugoe.exe", "browser": "user"})
+    outcome = runner.run("проверь окно")
+    assert outcome["ok"] is True
+    assert outcome["detail"]["source"] == "llm", outcome["detail"]
+    assert planner.calls == 1, "при несовпадении отпечатка зовём планировщик"
+    assert runner.recipes.count() == 1, "рецепт не удаляем — он может быть валиден в своём окне"

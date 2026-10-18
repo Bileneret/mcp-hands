@@ -34,6 +34,7 @@ MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_ABSOLUTE = 0x8000
 MOUSEEVENTF_VIRTUALDESK = 0x4000
+MOUSEEVENTF_WHEEL = 0x0800
 KEYEVENTF_KEYUP = 0x0002
 KEYEVENTF_UNICODE = 0x0004
 
@@ -284,7 +285,10 @@ class Actuator:
             if kind == INPUT_MOUSE:
                 if flags & MOUSEEVENTF_ABSOLUTE:
                     flags |= MOUSEEVENTF_VIRTUALDESK
-                events[index].mi = MOUSEINPUT(x, y, 0, flags, 0, None)
+                # Величина прокрутки колеса живёт в mouseData: без неё событие
+                # уходит «нулевым» и содержимое не двигается (найдено живой приёмкой).
+                wheel = value if flags & MOUSEEVENTF_WHEEL else 0
+                events[index].mi = MOUSEINPUT(x, y, wheel, flags, 0, None)
             elif flags & KEYEVENTF_UNICODE:
                 events[index].ki = KEYBDINPUT(0, value, flags, 0, None)
             else:
@@ -380,6 +384,57 @@ class Actuator:
 
     def move(self, x: int, y: int) -> tuple[int, int]:
         self._send((INPUT_MOUSE, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, *self.space.to_normalized(x, y), 0))
+
+    WM_MOUSEWHEEL = 0x020A
+    WHEEL_DELTA = 120
+
+    def scroll_message(self, hwnd: int, clicks: int, x: int, y: int) -> dict:
+        """Прокрутка СООБЩЕНИЕМ в окно: курсор пользователя не трогается вовсе.
+
+        Это предпочтительный путь (фоновая доставка ввода: человек может работать
+        мышью параллельно). Часть приложений, однако, реагирует на настоящее колесо —
+        для них есть `scroll_wheel`; выбор делает вызывающий по факту кадра.
+        """
+        self.user32.PostMessageW.argtypes = [wintypes.HWND, ctypes.c_uint,
+                                             wintypes.WPARAM, wintypes.LPARAM]
+        self.user32.PostMessageW.restype = ctypes.c_bool
+        delta = self.WHEEL_DELTA * (1 if clicks > 0 else -1) * abs(clicks)
+        lparam = ((y & 0xFFFF) << 16) | (x & 0xFFFF)
+        wparam = (delta & 0xFFFF) << 16
+        for _ in range(abs(clicks)):
+            ok = self.user32.PostMessageW(int(hwnd), self.WM_MOUSEWHEEL, wparam, lparam)
+            if not ok:
+                return {"ok": False, "how": "post_message", "clicks": clicks,
+                        "reason": "окно не приняло сообщение прокрутки"}
+        return {"ok": True, "how": "post_message", "clicks": clicks,
+                "point": [int(x), int(y)]}
+
+    def scroll_wheel(self, clicks: int, expect_hwnd: int = 0, point: tuple[int, int] | None = None,
+                     restore_cursor: bool = True) -> dict:
+        """Настоящее колесо в указанной точке (курсор вернётся на место, если просили).
+
+        Используется как резерв, когда сообщение окно проигнорировало: колесо —
+        физическое событие, его видят и Chromium, и игры. Перемещение курсора
+        восстанавливается, чтобы не мешать владельцу.
+        """
+        if expect_hwnd:
+            guard = self.guard_keyboard(expect_hwnd)
+            if not guard.get("ok"):
+                return {"ok": False, "how": "send_input", "reason": guard.get("reason", "")}
+        before = self.cursor() if restore_cursor else None
+        target = point or before or (0, 0)
+        self.move(int(target[0]), int(target[1]))
+        time.sleep(0.05)
+        delta = self.WHEEL_DELTA * (1 if clicks > 0 else -1) * abs(clicks)
+        events = self._send((INPUT_MOUSE, MOUSEEVENTF_WHEEL | MOUSEEVENTF_ABSOLUTE,
+                             *self.space.to_normalized(int(target[0]), int(target[1])),
+                             delta & 0xFFFFFFFF),)
+        if restore_cursor and before:
+            time.sleep(0.05)
+            self.move(int(before[0]), int(before[1]))
+        return {"ok": bool(events), "how": "send_input", "clicks": clicks,
+                "point": [int(target[0]), int(target[1])], "restored": bool(before)}
+
 
     def click(self, x: int, y: int, verify: bool = True, tolerance: int = 4,
               settle_s: float = 0.05, allow_unverified: bool = False) -> dict:

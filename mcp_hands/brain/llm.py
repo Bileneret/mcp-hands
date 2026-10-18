@@ -132,8 +132,13 @@ SYSTEM_PROMPT_TEMPLATE = """Ты — планировщик компьютерн
   "foreground_is", затем клик по найденному элементу;
 - числовые hwnd ты не знаешь и знать не должен: бери активное окно из разведки
   (observe возвращает active.hwnd), ищи окно через windows_list(query=...), либо
-  называй окно заголовком — window_activate и ocr_window принимают
-  title_substring;
+  называй окно заголовком — window_activate, ocr_window, click_text_on_screen и
+  scroll принимают title_substring;
+- в окнах БЕЗ API (плитки экспресс-панели, чужие приложения) пиксельный путь:
+  ocr_find/click_text_on_screen по видимому тексту, scroll для прокрутки; клик
+  считается удавшимся только если кадр изменился — не выдумывай успех;
+- для живой Opera предпочитай протокол: live_tabs (какие вкладки), затем
+  live_browser attach_tab, затем live_click_text/live_navigate;
 - если своей задачей чувства не хватает (нет нужного инструмента), верни
   план с единственным шагом "health" и expect {{"kind": "process_gone",
   "params": {{"note": "missing_tools: <перечисление>"}}}} — так честно фиксируется запрет;

@@ -30,6 +30,30 @@ class ScreenCaptureError(RuntimeError):
     """Ни один путь захвата не сработал: агенту нечем смотреть на экран."""
 
 
+def signature(image: np.ndarray, grid: int = 16) -> list[float]:
+    """Грубая подпись кадра: сетка средних яркостей (устойчива к шуму и миганию курсора).
+
+    Нужна для честной проверки «изменилось ли что-то на экране» после клика или
+    прокрутки: без неё вердикт был бы «нажал и надеюсь».
+    """
+    frame = np.asarray(image)
+    if frame.ndim == 3:
+        frame = frame[:, :, :3].mean(axis=2)
+    height, width = frame.shape[:2]
+    rows = max(1, height // grid)
+    cols = max(1, width // grid)
+    cropped = frame[: rows * grid, : cols * grid].astype("float32")
+    blocks = cropped.reshape(grid, rows, grid, cols).mean(axis=(1, 3))
+    return [round(float(value), 1) for value in blocks.reshape(-1)]
+
+
+def signature_distance(before: list[float], after: list[float]) -> float:
+    """Средняя абсолютная разница подписей: 0 — кадр не изменился."""
+    if not before or not after or len(before) != len(after):
+        return 255.0
+    return round(float(np.mean(np.abs(np.asarray(before) - np.asarray(after)))), 2)
+
+
 @dataclass
 class Frame:
     """Кадр в физических пикселях вместе с происхождением — иначе замеры не сравнить.

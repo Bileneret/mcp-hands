@@ -215,3 +215,26 @@ def test_live_status_without_own_tab_opens_nothing():
     facts = browser.status()
     assert facts["note"] == "рабочая вкладка ещё не открыта"
     assert browser.cdp is None
+
+def test_work_profile_tab_policy(tmp_path):
+    """Политика вкладок на своём профиле: список, привязка к указанной, честный отказ.
+
+    Живой тест включается только там, где есть Opera: в остальных средах он
+    пропускается по той же причине, что и остальные живые проверки слоя.
+    """
+    if not opera_path():
+        pytest.skip("opera.exe не найден — живой слой недоступен в этой среде")
+    browser = LiveBrowser()
+    try:
+        browser.start_work(headless=True)
+        browser.ensure_tab()
+        rows = browser.tabs()
+        assert rows and all("id" in row for row in rows), rows
+        picked = browser.attach_tab(tab_id=str(rows[0]["id"]))
+        assert picked.get("ok") is True, picked
+        assert "focused" in picked
+        missing = browser.attach_tab(title_substring="нет-такой-вкладки-98765")
+        assert missing.get("ok") is False and "нет" in missing["reason"], missing
+    finally:
+        stopped = browser.stop()
+        assert stopped.get("stopped") is True, stopped

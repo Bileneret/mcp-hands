@@ -47,8 +47,9 @@ TOOL_NAMES = frozenset({
     "word_report_from_template", "word_format_document", "excel_workbook_build",
     "browser_tabs_audit", "browser_collect_sources",
     "browser_extract_text", "word_docx_to_pdf", "browser_video_capture",
-    "live_browser", "live_navigate", "live_page", "live_search",
-    "live_click_text", "live_video", "live_screenshot", "live_youtube"})
+    "live_browser", "live_navigate", "live_page", "live_search", "live_tabs",
+    "live_click_text", "live_video", "live_screenshot", "live_youtube",
+    "click_text_on_screen", "scroll"})
 
 server = MCPServer(
     name="mcp-hands",
@@ -416,6 +417,8 @@ def observe(max_lines: int = 25) -> ToolResult:
     facts["browser"] = {"mode": browser.mode, "port": browser.port,
                         "tab_url": (browser.tab or {}).get("url", ""),
                         "tab_title": (browser.tab or {}).get("title", "")}
+    if browser.mode:  # список вкладок нужен цели, чтобы решать: своя, текущая или новая
+        facts["browser"].update(browser.tabs_summary())
     from .ocr import available as ocr_available
 
     facts["capabilities"] = {"ocr": bool(ocr_available()), "live": bool(browser.mode),
@@ -1267,10 +1270,13 @@ def _live():
 
 @server.tool(structured_output=True)
 def live_browser(action: str = "start", profile: str = "work",
-                 headless: bool = True) -> ToolResult:
+                 headless: bool = True, tab: str = "",
+                 title_substring: str = "") -> ToolResult:
     """Живой браузер (Opera GX) под CDP: start (свой профиль) / connect_user
     (ЖИВАЯ Opera владельца с отладочным портом — запускается его лончером;
-    наш сервер её не перезапускает и не закрывает) / stop / status.
+    наш сервер её не перезапускает и не закрывает) / attach_tab (работать в
+    указанной вкладке владельца — решение владельца 19.10; ничего не закрываем
+    и не переставляем) / stop / status.
 
     Управление протоколом: навигация, поиск, DOM-клики, видео, полный экран,
     скриншот. Браузер владельца без отладочного порта не трогается вовсе.
@@ -1292,6 +1298,8 @@ def live_browser(action: str = "start", profile: str = "work",
                     raise
         elif action == "connect_user":
             outcome = browser.connect_user()
+        elif action == "attach_tab":
+            outcome = browser.attach_tab(tab, title_substring=title_substring)
         elif action == "stop":
             outcome = {**browser.stop(), "ok": True}
         elif action == "status":
@@ -1467,6 +1475,253 @@ def live_youtube(query: str, fullscreen: bool = True,
         return _fail("live_youtube", started, f"{type(exc).__name__}: {exc}")
     finally:
         pass  # живая сессия живёт до явного live_browser(stop); в user-режиме не закрываем
+
+
+@server.tool(structured_output=True)
+def live_tabs() -> ToolResult:
+    """Вкладки живой Opera: id, заголовок, адрес и какая из них наша рабочая.
+
+    Ничего не открывает, не закрывает и не переставляет: цель сама решает, работать
+    в своей вкладке, в текущей вкладке владельца (live_browser attach_tab) или открыть новую.
+    """
+    started = time.perf_counter()
+    browser = _live()
+    if not browser.mode:
+        return _fail("live_tabs", started,
+                     "живая сессия не подключена: сначала live_browser start/connect_user", True)
+    try:
+        rows = browser.tabs()
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_tabs", started, f"{type(exc).__name__}: {exc}")
+    ours = next((row for row in rows if row["ours"]), {})
+    result = ToolResult(ok=True, refused=False,
+                        summary=f"вкладок: {len(rows)}; рабочая: {ours.get('title', '—')[:60]}",
+                        detail={"tabs": rows, "ours": ours, "count": len(rows)})
+    _journal("live_tabs", started, result, {})
+    return result
+
+
+# --- пиксельный путь (Шаг 2: окна без API — экспресс-панель и любые приложения) ----
+
+
+def _window_frame_signature(hwnd: int) -> list[float]:
+    """Подпись видимой части окна — «до/после» для честной проверки действия."""
+    from .screen import signature
+
+    frame = _screen().crop_window(_coordinate_space(), hwnd, _screen().grab(timeout_s=2.0))
+    return signature(frame.image)
+
+
+def _motion_measure(hwnd: int, action, settle_s: float = 0.5) -> dict:
+    """Изменение кадра от действия НА ФОНЕ собственного дрожания окна.
+
+    Порог нельзя назначать «на глаз»: живой замер 19.10 показал шум покоя 0.0, а
+    небольшой сдвиг списка — всего 0.96. Поэтому сначала измеряется шум окна
+    (два снимка подряд: мигающий курсор, анимация, часы), затем выполняется
+    действие и сравнивается результат. «Изменилось» — если эффект заметно выше
+    собственного шума (втрое и больше, но не меньше 0.6).
+    """
+    import time as _time
+
+    from .screen import signature_distance
+
+    first = _window_frame_signature(hwnd)
+    _time.sleep(0.25)
+    second = _window_frame_signature(hwnd)
+    noise = signature_distance(first, second)
+    action()
+    _time.sleep(settle_s)
+    after = _window_frame_signature(hwnd)
+    delta = signature_distance(second, after)
+    threshold = max(0.6, noise * 3.0)
+    return {"noise": noise, "delta": delta, "threshold": round(threshold, 2),
+            "changed": delta >= threshold}
+
+
+@server.tool(structured_output=True)
+def click_text_on_screen(text: str, hwnd: int = 0, title_substring: str = "",
+                         exact: bool = False, dry_run: bool = False) -> ToolResult:
+    """Клик по тексту НА ЭКРАНЕ (пиксельный путь: экспресс-панель и окна без API).
+
+    Порядок жёсткий, «слепых» координат нет: текст ищется распознаванием в кадре окна,
+    окно активируется под стражами (рабочий стол, права процесса, фокус), клик идёт
+    строго в центр найденного слова, а после клика подпись кадра сравнивается с прежней —
+    изменилось ли что-то. Нет изменений — честный вердикт «не подтвердилось».
+    `dry_run=True` показывает точку и не отправляет ни одного события.
+    """
+    started = time.perf_counter()
+    from .screen import signature_distance
+
+    hwnd, why = resolve_window(hwnd, title_substring)
+    if not hwnd:
+        return _fail("click_text_on_screen", started, why, True,
+                     hwnd=hwnd, title_substring=title_substring)
+    found = ocr_find(text, hwnd=hwnd, exact=exact)
+    matches = (found.detail or {}).get("matches") or []
+    if not matches:
+        return _fail("click_text_on_screen", started,
+                     f"текст {text!r} не найден в окне {hwnd}: кликать некуда "
+                     "(ищем глазами, а не по угаданным координатам)", True, hwnd=hwnd)
+    rect = matches[0]["rect"]
+    point = ((int(rect[0]) + int(rect[2])) // 2, (int(rect[1]) + int(rect[3])) // 2)
+    occlusion = (found.detail or {}).get("occlusion") or {}
+    if occlusion.get("covered"):
+        who = (occlusion.get("by") or [{}])[0].get("title", "")
+        return _fail("click_text_on_screen", started,
+                     f"окно перекрыто ({who[:40]}): найденный текст может быть чужим — "
+                     "сначала выведи окно на передний план", True, hwnd=hwnd)
+    try:
+        desktop = _act().window_desktop(hwnd)
+        if desktop and desktop != _act().own_desktop():
+            return _fail("click_text_on_screen", started,
+                         f"окно на другом рабочем столе ({desktop}): ввод запрещён", True,
+                         hwnd=hwnd)
+        pid = next((row["pid"] for row in (windows_list().detail or {}).get("windows", [])
+                    if int(row["hwnd"]) == hwnd), 0)
+        uipi_blocked = bool(pid) and bool(_act().can_control(int(pid)).get("blocked_by_uipi"))
+        if dry_run:
+            detail = {"hwnd": hwnd, "point": list(point), "text": matches[0]["text"],
+                      "variants": len(matches), "dry_run": True}
+            if uipi_blocked:
+                detail["warning"] = ("ввод в это окно запрещён уровнем целостности: "
+                                     "в бою клик будет отклонён")
+            result = ToolResult(ok=True, refused=False,
+                                summary=f"сухой прогон: клик по {matches[0]['text']!r} "
+                                        f"в {point[0]}x{point[1]} (события не отправлены)",
+                                detail=detail)
+            _journal("click_text_on_screen", started, result, {"dry_run": True, "hwnd": hwnd})
+            return result
+        if uipi_blocked:
+            return _fail("click_text_on_screen", started,
+                         f"ввод в процесс {pid} запрещён уровнем целостности (UIPI)",
+                         True, hwnd=hwnd)
+        active = _act().activate(hwnd)
+        if not active.get("ok"):
+            return _fail("click_text_on_screen", started,
+                         f"окно не удалось активировать: {active.get('reason', '')}", True,
+                         hwnd=hwnd)
+        guard = _act().guard_keyboard(hwnd)
+        if not guard.get("ok"):
+            return _fail("click_text_on_screen", started,
+                         f"окно не в фокусе: {guard.get('reason', '')}", True, hwnd=hwnd)
+        clicked = {}
+        motion = {"noise": 0.0, "delta": 0.0, "threshold": 0.6, "changed": False}
+
+        def _click_now() -> None:
+            result = _act().click(point[0], point[1], verify=True)
+            clicked.update(result)
+
+        motion = _motion_measure(hwnd, _click_now, settle_s=0.35)
+    except Exception as exc:  # noqa: BLE001 — ввод не должен падать «в тишину»
+        return _fail("click_text_on_screen", started, f"{type(exc).__name__}: {exc}", hwnd=hwnd)
+    distance = motion["delta"]
+    changed = motion["changed"]
+    # Вердикт инструмента — «клик доставлен в найденную точку»: это то, что он может
+    # гарантировать (курсор проверен, событие отправлено). Изменение кадра — ДОПОЛНИТЕЛЬНОЕ
+    # свидетельство: кнопка может сработать без перерисовки (живой прогон 19.10: клик попал,
+    # журнал мишени подтвердил, а кадр не изменился). Реакцию приложения судит постусловие
+    # цели (page_matches/text_on_screen/window_open), а не сам клик.
+    delivered = bool(clicked.get("ok"))
+    reason = ""
+    if not delivered:
+        reason = clicked.get("reason", "клик не отправлен")
+    elif not changed:
+        reason = (f"клик доставлен, но визуальных изменений не заметно (дельта {distance}): "
+                  "реакцию подтвердит постусловие цели")
+    result = ToolResult(ok=delivered, refused=False, reason=reason,
+                        summary=(f"клик по {matches[0]['text']!r} в {point[0]}x{point[1]}: "
+                                 + ("доставлен, кадр изменился" if changed
+                                    else "доставлен, кадр без изменений")),
+                        detail={"hwnd": hwnd, "point": list(point), "text": matches[0]["text"],
+                                "click": clicked, "frame_delta": distance,
+                                "frame_noise": motion["noise"],
+                                "frame_threshold": motion["threshold"],
+                                "changed": changed, "variants": len(matches)})
+    _journal("click_text_on_screen", started, result, {"hwnd": hwnd, "text": text})
+    return result
+
+
+@server.tool(structured_output=True)
+def scroll(clicks: int = 3, hwnd: int = 0, title_substring: str = "",
+           dry_run: bool = False) -> ToolResult:
+    """Прокрутка колесом: сначала сообщением в окно (курсор не трогаем), а если окно
+    не отреагировало — настоящим колесом в его центре с возвратом курсора на место.
+
+    Эффект подтверждается подписью кадра: «прокрутил» без изменений не выдаётся за
+    успех. Отрицательные `clicks` — вверх. Окно называется дескриптором или заголовком.
+    """
+    started = time.perf_counter()
+    from .geometry import rect_center
+    from .screen import signature_distance
+
+    if not clicks:
+        return _fail("scroll", started, "clicks=0: нечего делать", True)
+    hwnd, why = resolve_window(hwnd, title_substring)
+    if not hwnd:
+        return _fail("scroll", started, why, True, hwnd=hwnd, title_substring=title_substring)
+    try:
+        centre = rect_center(_coordinate_space().window_frame(hwnd))
+        if dry_run:
+            result = ToolResult(ok=True, refused=False,
+                                summary=f"сухой прогон: прокрутка {clicks} в "
+                                        f"{centre[0]}x{centre[1]}",
+                                detail={"hwnd": hwnd, "clicks": clicks, "point": list(centre),
+                                        "dry_run": True})
+            _journal("scroll", started, result, {"dry_run": True, "hwnd": hwnd})
+            return result
+        state = {"message": {}}
+        motion = _motion_measure(hwnd, lambda: state.update(
+            message=_act().scroll_message(hwnd, clicks, int(centre[0]), int(centre[1]))),
+            settle_s=0.4)
+        first = state["message"]
+        distance = motion["delta"]
+        how = "сообщение в окно"
+        if first.get("ok") and not motion["changed"]:
+            # Часть приложений (Chromium, проводник, игры) сообщения игнорирует: нужно
+            # настоящее колесо. Оно уходит окну ПОД КУРСОРОМ, поэтому окно обязано быть
+            # на виду и в фокусе — иначе прокрутится чужое (стражи, как у пиксельного клика).
+            desktop = _act().window_desktop(hwnd)
+            if desktop and desktop != _act().own_desktop():
+                return _fail("scroll", started,
+                             f"окно на другом рабочем столе ({desktop}): ввод запрещён",
+                             True, hwnd=hwnd)
+            from .geometry import window_occlusion
+
+            blocked = window_occlusion(hwnd)
+            if blocked.get("covered") and float(blocked.get("share", 0)) > 0.2:
+                who = (blocked.get("by") or [{}])[0].get("title", "")
+                return _fail("scroll", started,
+                             f"окно перекрыто ({who[:40]}): колесо уйдёт чужому окну — "
+                             "сначала выведи окно на передний план", True, hwnd=hwnd)
+            _act().activate(hwnd)
+            guard = _act().guard_keyboard(hwnd)
+            if not guard.get("ok"):
+                return _fail("scroll", started,
+                             f"окно не в фокусе: {guard.get('reason', '')}", True, hwnd=hwnd)
+            time.sleep(0.25)  # окно должно успеть стать активным до колеса
+            motion = _motion_measure(
+                hwnd, lambda: state.update(
+                    wheel=_act().scroll_wheel(clicks, expect_hwnd=hwnd, point=centre)),
+                settle_s=0.55)  # плавная прокрутка доигрывает анимацию
+            second = state["wheel"]
+            distance = motion["delta"]
+            how = "реальное колесо (курсор возвращён)"
+            if not second.get("ok"):
+                first = second
+    except Exception as exc:  # noqa: BLE001
+        return _fail("scroll", started, f"{type(exc).__name__}: {exc}", hwnd=hwnd)
+    changed = motion["changed"]
+    result = ToolResult(ok=changed, refused=False,
+                        reason="" if changed else
+                        (f"кадр не изменился заметно (дельта {distance} при пороге "
+                         f"{motion['threshold']}): прокрутка не подтвердилась"),
+                        summary=(f"прокрутка {clicks} ({how}): "
+                                 + ("содержимое сдвинулось" if changed else "изменений нет")),
+                        detail={"hwnd": hwnd, "clicks": clicks, "how": how,
+                                "frame_delta": distance, "frame_noise": motion["noise"],
+                                "frame_threshold": motion["threshold"], "changed": changed})
+    _journal("scroll", started, result, {"hwnd": hwnd, "clicks": clicks})
+    return result
 
 
 # --- файлы (колонна B: политика «только корзина») -------------------------------
