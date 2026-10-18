@@ -18,12 +18,15 @@ import json
 import time
 from pathlib import Path
 
+from ..brain.inspector import inspect_artifact
 from ..brain.plan import parse_plan
 from ..brain.runner import RunnerLimits, run_plan
+from ..checkpoints import CheckpointStore
 from ..memory import DEFAULT_DB, Memory
 from .tasks import TASKS
 
 ARTIFACTS = Path(__file__).resolve().parents[2] / "logs" / "benchmark"
+CHECKPOINTS = Path(__file__).resolve().parents[2] / "logs" / "checkpoints"
 
 # Скриптовые планы для покрытых задач (воспроизводимость без сети).
 SCRIPTED_PLANS: dict[str, dict] = {
@@ -223,29 +226,39 @@ def _live_replan(config, memory: Memory, task):
 
 def run_suite(task_ids: list[str] | None = None, live: bool = False,
               db_path: Path | str = DEFAULT_DB,
-              limits: RunnerLimits | None = None) -> dict:
-    """Прогоняет выбранные задачи (по умолчанию все 10) и пишет метрики в память."""
+              limits: RunnerLimits | None = None, rounds: int = 1,
+              hardening: bool = True) -> dict:
+    """Прогоняет выбранные задачи (по умолчанию все 10) и пишет метрики в память.
+
+    `rounds` — повторы задачи (приёмка этапа 4: ≥3 кругов для порога автономности).
+    `hardening` — включить контур этапа 4: L2-инспектор (`verifier`) и чекпойнты.
+    Сводка несёт `autonomy` (прогоны без вмешательств человека — DESIGN §7).
+    """
     memory = Memory(db_path)
     started = time.perf_counter()
     rows: list[dict] = []
+    verifier = inspect_artifact if hardening else None
+    checkpoints = CheckpointStore(ARTIFACTS.parent / "checkpoints") if hardening else None
     config = None
     if live:
-        from ..brain.llm import load_config, request_plan
+        from ..brain.llm import load_config
 
         config = load_config()
     try:
-        for task in TASKS:
+        for round_index in range(1, max(1, rounds) + 1):
+          for task in TASKS:
             if task_ids and task.id not in task_ids:
                 continue
             if task.id in STANDS:
                 stamp = time.strftime("%Y%m%d_%H%M%S")
-                stand_workdir = ARTIFACTS / "stands" / task.id / stamp
+                stand_workdir = ARTIFACTS / "stands" / task.id / f"{stamp}_r{round_index}"
                 stand_workdir.mkdir(parents=True, exist_ok=True)
                 prepared = STANDS[task.id](stand_workdir)
                 plan = parse_plan(prepared["plan"])
                 run = run_plan(plan, limits or RunnerLimits(), memory=memory,
-                               plan_source="scripted-stand")
-                rows.append({"task_id": task.id,
+                               plan_source="scripted-stand", verifier=verifier,
+                               checkpoints=checkpoints)
+                rows.append({"task_id": task.id, "round": round_index,
                              "status": "passed" if run.ok else "failed",
                              "reason": run.reason, "total_ms": round(run.total_ms, 1),
                              "replans": run.replans, "steps": len(run.steps),
@@ -253,10 +266,12 @@ def run_suite(task_ids: list[str] | None = None, live: bool = False,
                 continue
             if task.id not in SCRIPTED_PLANS:
                 # задача не покрыта набором инструментов — честная фиксация
-                rows.append(_record_missing(task, memory))
+                rows.append({**_record_missing(task, memory), "round": round_index})
                 continue
             plan_dict = SCRIPTED_PLANS[task.id]
             if live:
+                from ..brain.llm import request_plan
+
                 result = request_plan(config, task.id, task.title, task.needs, task.note)
                 for attempt in result.attempts:
                     memory.record_llm_call(
@@ -270,8 +285,8 @@ def run_suite(task_ids: list[str] | None = None, live: bool = False,
                     run_id = memory.start_run(task.id, plan_source="llm")
                     memory.finish_run(run_id, status="failed", ok=False,
                                       reason=f"план не получен: {result.error}")
-                    rows.append({"task_id": task.id, "status": "failed",
-                                 "reason": result.error})
+                    rows.append({"task_id": task.id, "round": round_index,
+                                 "status": "failed", "reason": result.error})
                     continue
                 plan = result.plan
                 source = "llm"
@@ -279,14 +294,17 @@ def run_suite(task_ids: list[str] | None = None, live: bool = False,
                 plan = parse_plan(plan_dict)
                 source = "scripted"
             run = run_plan(plan, limits or RunnerLimits(), memory=memory,
-                           plan_source=source,
+                           plan_source=source, verifier=verifier,
+                           checkpoints=checkpoints,
                            llm_request_plan=(
                                _live_replan(config, memory, task) if live else None))
-            rows.append({"task_id": task.id, "status": "passed" if run.ok else "failed",
+            rows.append({"task_id": task.id, "round": round_index,
+                         "status": "passed" if run.ok else "failed",
                          "reason": run.reason, "total_ms": round(run.total_ms, 1),
                          "replans": run.replans, "steps": len(run.steps)})
     finally:
         summary = {"mode": "llm" if live else "scripted (--dry-llm)",
+                   "rounds": max(1, rounds),
                    "tasks": rows,
                    "passed": sum(1 for r in rows if r["status"] == "passed"),
                    "missing_tools": sum(1 for r in rows if r["status"] == "missing_tools"),
@@ -307,13 +325,20 @@ def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     task_ids = None
     live = "--live" in argv
+    rounds = 1
     if "--tasks" in argv:
         index = argv.index("--tasks")
         task_ids = [t.strip() for t in argv[index + 1].split(",") if t.strip()]
-    summary = run_suite(task_ids=task_ids, live=live)
+    if "--rounds" in argv:
+        rounds = int(argv[argv.index("--rounds") + 1])
+    no_hardening = "--no-hardening" in argv
+    summary = run_suite(task_ids=task_ids, live=live, rounds=rounds,
+                        hardening=not no_hardening)
     print(json.dumps({k: summary[k] for k in
-                      ("mode", "passed", "missing_tools", "failed", "total_ms", "report")},
+                      ("mode", "rounds", "passed", "missing_tools", "failed",
+                       "total_ms", "report")},
                      ensure_ascii=False, indent=1))
+    print("автономность:", json.dumps(summary["metrics"]["autonomy"], ensure_ascii=False))
     for row in summary["tasks"]:
         mark = {"passed": "+", "missing_tools": "~", "failed": "!"}[row["status"]]
         print(f"  [{mark}] {row['task_id']}: {row['status']} {row.get('reason', '')[:80]}")

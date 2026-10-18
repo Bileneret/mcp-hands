@@ -111,6 +111,7 @@ class StepOutcome:
     evidence: str = ""
     disputed: bool = False  # L1 и L2 разошлись (этап 4)
     rolled_back: bool = False  # файлы восстановлены из чекпойнта (этап 4)
+    human_required: bool = False  # причина класса «нужен человек» (этап 4, метрика)
 
 
 @dataclass
@@ -377,6 +378,11 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
             outcome.reason = ""
             break
         outcome.ms = (time.perf_counter() - step_started) * 1000.0
+        # Метрика автономности: причина класса «нужен человек» (модальный диалог,
+        # стоп-кран) — это вмешательство, а не просто сбой (DESIGN §7).
+        if not outcome.ok and any(marker in (outcome.reason or "").lower()
+                                  for marker in ("нужен человек", "модальн")):
+            outcome.human_required = True
         # Транзакционный откат: неуспех изменяющего шага - файлы возвращаются
         # к состоянию до шага (из манифеста чекпойнта, с проверкой хэша).
         if checkpoint is not None and not outcome.ok:
@@ -391,6 +397,8 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
             memory.record_step(run_id, outcome)
             if outcome.disputed:
                 memory.record_incident(run_id, "l2_disputed", step.action, outcome.reason)
+            elif outcome.human_required:
+                memory.record_incident(run_id, "human_required", step.action, outcome.reason)
             elif not outcome.ok and (outcome.reason or "").startswith("постусловие"):
                 memory.record_incident(run_id, "expect_failed", step.action, outcome.reason)
         if outcome.ok:
@@ -423,7 +431,8 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
     if memory is not None:
         memory.finish_run(run_id, status="passed" if run.ok else "failed", ok=run.ok,
                           reason=run.reason, total_ms=run.total_ms, replans=run.replans,
-                          cumulative_tokens=run.cumulative_tokens)
+                          cumulative_tokens=run.cumulative_tokens,
+                          human_interventions=sum(1 for s in run.steps if s.human_required))
     return run
 
 

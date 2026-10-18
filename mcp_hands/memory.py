@@ -35,7 +35,9 @@ CREATE TABLE IF NOT EXISTS runs (
     total_ms REAL,
     replans INTEGER NOT NULL DEFAULT 0,
     cumulative_tokens INTEGER NOT NULL DEFAULT 0,
-    plan_source TEXT NOT NULL DEFAULT 'scripted'  -- scripted | llm
+    plan_source TEXT NOT NULL DEFAULT 'scripted',  -- scripted | llm
+    human_interventions INTEGER NOT NULL DEFAULT 0,  -- сколько раз требовался человек
+    human_wait_ms REAL NOT NULL DEFAULT 0.0          -- сколько ждали человека
 );
 CREATE TABLE IF NOT EXISTS steps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -88,7 +90,17 @@ class Memory:
         self.conn = sqlite3.connect(str(self.path))
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
         self.conn.commit()
+
+    def _migrate(self) -> None:
+        """Добор колонок в существующих базах (аудит v17: human_* метрики)."""
+        columns = {row["name"] for row in
+                   self.conn.execute("PRAGMA table_info(runs)").fetchall()}
+        if "human_interventions" not in columns:
+            self.conn.execute("ALTER TABLE runs ADD COLUMN human_interventions INTEGER NOT NULL DEFAULT 0")
+        if "human_wait_ms" not in columns:
+            self.conn.execute("ALTER TABLE runs ADD COLUMN human_wait_ms REAL NOT NULL DEFAULT 0.0")
 
     # --- запись ------------------------------------------------------------
 
@@ -129,12 +141,13 @@ class Memory:
 
     def finish_run(self, run_id: int, *, status: str, ok: bool, reason: str = "",
                    total_ms: float = 0.0, replans: int = 0,
-                   cumulative_tokens: int = 0) -> None:
+                   cumulative_tokens: int = 0, human_interventions: int = 0,
+                   human_wait_ms: float = 0.0) -> None:
         self.conn.execute(
             "UPDATE runs SET status=?, ok=?, reason=?, ended_ts=?, total_ms=?, replans=?,"
-            " cumulative_tokens=? WHERE id=?",
+            " cumulative_tokens=?, human_interventions=?, human_wait_ms=? WHERE id=?",
             (status, int(ok), reason, time.time(), total_ms, replans,
-             cumulative_tokens, run_id))
+             cumulative_tokens, int(human_interventions), float(human_wait_ms), run_id))
         self.conn.commit()
 
     # --- чтение ------------------------------------------------------------
@@ -144,7 +157,14 @@ class Memory:
         runs = [dict(row) for row in self.conn.execute(
             "SELECT task_id, status, COUNT(*) AS runs, SUM(ok) AS passed,"
             " AVG(total_ms) AS avg_ms, SUM(cumulative_tokens) AS tokens,"
-            " SUM(replans) AS replans FROM runs GROUP BY task_id, status")]
+            " SUM(replans) AS replans, SUM(human_interventions) AS interventions"
+            " FROM runs GROUP BY task_id, status")]
+        totals = self.conn.execute(
+            "SELECT COUNT(*) AS runs,"
+            " SUM(CASE WHEN human_interventions = 0 THEN 1 ELSE 0 END) AS autonomous,"
+            " SUM(human_wait_ms) AS wait_ms FROM runs WHERE status != 'running'").fetchone()
+        finished = int(totals["runs"] or 0)
+        autonomous = int(totals["autonomous"] or 0)
         tokens_total = self.conn.execute(
             "SELECT COALESCE(SUM(prompt_tokens + completion_tokens), 0) AS t,"
             " COUNT(*) AS calls FROM llm_calls").fetchone()
@@ -153,6 +173,9 @@ class Memory:
         steps_failed = self.conn.execute(
             "SELECT COUNT(*) AS n FROM steps WHERE ok = 0").fetchone()["n"]
         return {"by_task_status": runs,
+                "autonomy": {"finished_runs": finished, "autonomous_runs": autonomous,
+                             "rate": round(autonomous / finished, 3) if finished else None,
+                             "human_wait_ms": round(float(totals["wait_ms"] or 0.0), 1)},
                 "llm": {"calls": tokens_total["calls"], "tokens": tokens_total["t"],
                         "approx_usd": None},  # тариф провайдера меняется — цифра снаружи
                 "incidents": incidents, "failed_steps": steps_failed}
