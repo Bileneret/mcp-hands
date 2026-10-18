@@ -1030,14 +1030,18 @@ def live_browser(action: str = "start", profile: str = "work",
         elif action == "stop":
             outcome = {**browser.stop(), "ok": True}
         elif action == "status":
-            outcome = {"ok": True, "mode": browser.mode, "port": browser.port}
+            outcome = {"ok": True, **browser.status()}
         else:
             return _fail("live_browser", started, f"неизвестное действие {action!r}", True)
     except Exception as exc:  # noqa: BLE001
         return _fail("live_browser", started, f"{type(exc).__name__}: {exc}")
     ok = bool(outcome.get("ok", True))
+    mode = outcome.get("mode") or (profile if action == "start" else "")
+    page = outcome.get("title") or outcome.get("url") or outcome.get("note", "")
     result = ToolResult(ok=ok, refused=False, reason=outcome.get("reason", ""),
-                        summary=f"живой браузер: {action} ({outcome.get('mode', profile)})",
+                        summary=f"живой браузер: {action}"
+                                + (f" ({mode})" if mode else "")
+                                + (f" — {page[:70]}" if page else ""),
                         detail=outcome)
     _journal("live_browser", started, result, {"action": action, "profile": profile})
     return result
@@ -1194,6 +1198,8 @@ def live_youtube(query: str, fullscreen: bool = True,
                             detail=outcome)
         _journal("live_youtube", started, result, {"query": query})
         return result
+    except Exception as exc:  # noqa: BLE001 — обрыв связи и прочие отказы: вердикт, не падение
+        return _fail("live_youtube", started, f"{type(exc).__name__}: {exc}")
     finally:
         pass  # живая сессия живёт до явного live_browser(stop); в user-режиме не закрываем
 

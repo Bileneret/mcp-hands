@@ -28,6 +28,17 @@ INTENT_RULES: list[tuple[str, str]] = [
 ]
 
 
+def _site_in(text: str) -> str | None:
+    """Какой сайт назван в фразе. Названия матчатся как слова с падежным хвостом
+    («ютубе», «оперу»), поэтому короткий алиас «вк» не ловится внутри других
+    слов («вконце»). Шаблон собирается конкатенацией: в f-строке `{0,2}`
+    превратилось бы в выражение-кортеж, а не в квантификатор."""
+    for alias in SITE_ALIASES:
+        if re.search(r"\b" + re.escape(alias) + r"[а-яё]{0,2}\b", text):
+            return alias
+    return None
+
+
 def route(text: str) -> dict | None:
     """Возвращает локальный интент {"action", "args", "say"} или None (→ старший мозг)."""
     lowered = text.lower().strip()
@@ -74,6 +85,19 @@ def route(text: str) -> dict | None:
                 # у YouTube «следующее» — Shift+N (доверенная клавиша через CDP)
                 args = {"key": "N", "code": "KeyN", "shift": True}
             return {"action": action, "args": args, "say": says.get(action, "")}
+
+    # «открой/запусти оперу» — живой браузер (сначала живой экземпляр владельца)
+    if (re.search(r"\b(опер\w*|браузер\w*|browser)\b", lowered)
+            and re.search(r"\b(открой|открыть|запусти|включи|подключи|open)\b", lowered)):
+        return {"action": "browser_open", "args": {}, "say": "Открываю браузер."}
+
+    # Сайт назван + команда открыть в ЛЮБОМ порядке слов: «найди на экране YouTube
+    # и открой его» — живая речь не держит шаблона «открой X и найди Y».
+    site = _site_in(lowered)
+    if site and re.search(r"\b(открой|открыть|запусти|включи|включить|перейди|open)\b",
+                          lowered):
+        return {"action": "navigate", "args": {"url": SITE_ALIASES[site]},
+                "say": f"Открываю {site}."}
 
     # «найди …» на текущей странице
     match = re.search(r"\b(найди|поищи|search)\s+(.+)", lowered)

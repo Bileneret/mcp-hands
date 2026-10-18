@@ -21,7 +21,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from .scenarios.browser_links import Cdp, free_port
+from .scenarios.browser_links import Cdp, CdpTransportError, free_port
 
 ROOT = Path(__file__).resolve().parents[1]
 WORK_PROFILE = ROOT / "logs" / "live" / "opera_profile"
@@ -146,39 +146,124 @@ class LiveBrowser:
         return {"stopped": True, "killed": bool(killed)}
     # --- операции -------------------------------------------------------
 
-    def _require(self) -> Cdp:
+    def _cdp(self) -> Cdp:
+        """Клиент сессии или внятный отказ: «нет соединения» — это тоже связь."""
         if self.cdp is None:
-            raise RuntimeError("браузер не подключён: live_browser start/connect")
+            raise CdpTransportError("обрыв связи: живая сессия не подключена "
+                                    "(live_browser start/connect)")
+        return self.cdp
+
+    def _endpoint(self, path: str = "/json/list") -> list:
+        """Список вкладок отладочного порта; мёртвый порт → ошибка связи."""
+        try:
+            return self._cdp().endpoint(path)
+        except Exception as exc:  # noqa: BLE001 — порт закрылся вместе с браузером
+            raise CdpTransportError(
+                f"обрыв связи: отладочный порт {self.port} не отвечает "
+                f"({type(exc).__name__}: {exc})") from exc
+
+    def _open_page(self, url: str) -> dict:
+        try:
+            return self._cdp().open_page(url)
+        except Exception as exc:  # noqa: BLE001 — вкладку открыть не удалось: порт мёртв
+            raise CdpTransportError(
+                f"обрыв связи: не удалось открыть вкладку на порту {self.port} "
+                f"({type(exc).__name__}: {exc})") from exc
+
+    def _connect_tab(self, tab: dict) -> None:
+        try:
+            self._cdp().connect(tab["webSocketDebuggerUrl"])
+        except Exception as exc:  # noqa: BLE001 — вкладка не принимает соединение
+            raise CdpTransportError(
+                f"обрыв связи: вкладка не принимает подключение "
+                f"({type(exc).__name__}: {exc})") from exc
+
+    def _call(self, method: str, **params) -> dict:
+        """Вызов CDP с самолечением: разрыв связи → перепривязка к вкладке → один повтор.
+
+        Живая сцена длится минуты, а вкладка (или целый браузер) в это время может
+        закрыться: в логе владельца это давало «WinError 10053» и мёртвую сцену.
+        Теперь слой сначала пробует восстановиться и лишь потом честно отказывает;
+        ЛЮБОЙ путь отказа связи приводит к CdpTransportError с маркером «обрыв связи»
+        — по нему ассистент понимает, что нужно перезапустить браузер.
+        """
+        try:
+            return self._require().call(method, **params)
+        except CdpTransportError as first:
+            try:
+                self._reattach()
+                return self._require().call(method, **params)
+            except Exception as exc:  # noqa: BLE001 — второй отказ уже окончательный
+                raise CdpTransportError(
+                    f"обрыв связи с браузером: {first}; повтор не удался: "
+                    f"{type(exc).__name__}: {exc}") from exc
+
+    def _reattach(self) -> None:
+        """Возвращает рабочую точку после разрыва: та же вкладка, иначе — новая."""
+        previous_id = (self.tab or {}).get("id")
+        if self.cdp is not None:
+            self.cdp.close()
+            self.tab = {}
+            if previous_id:
+                try:
+                    for tab in self.cdp.endpoint("/json/list"):
+                        if tab.get("id") == previous_id and tab.get("type") == "page":
+                            self.tab = tab
+                            self.cdp.connect(tab["webSocketDebuggerUrl"])
+                            self.cdp.call("Page.enable")
+                            return
+                except Exception:  # noqa: BLE001 — вкладки уже нет: откроем свою
+                    self.tab = {}
+        if self.mode:
+            self._require()
+
+    def _require(self) -> Cdp:
+        cdp = self._cdp()
         if not self.tab:
             # рабочая вкладка ещё не выбрана: у себя берём первую, в браузере
             # ВЛАДЕЛЬЦА открываем СВОЮ (его вкладки не трогаем никогда)
             if self.mode == "user":
-                tab = self.cdp.open_page("about:blank")
+                tab = self._open_page("about:blank")
                 self.tab = tab
-                self.cdp.connect(tab["webSocketDebuggerUrl"])
-                self.cdp.call("Page.enable")
+                self._connect_tab(tab)
+                self._call("Page.enable")
             else:
                 self.ensure_tab()
-        return self.cdp
+        return cdp
 
     def ensure_tab(self) -> dict:
         """Первая вкладка типа page (или единственная) как рабочая точка."""
-        cdp = self.cdp
-        if cdp is None:
-            raise RuntimeError("браузер не подключён: live_browser start/connect")
-        pages = [tab for tab in cdp.endpoint("/json/list")
+        cdp = self._cdp()
+        pages = [tab for tab in self._endpoint("/json/list")
                  if tab.get("type") == "page"]
         if not pages:
-            raise RuntimeError("в браузере нет открытых вкладок")
+            raise CdpTransportError("обрыв связи: в браузере нет открытых вкладок")
         self.tab = pages[0]
-        cdp.connect(self.tab["webSocketDebuggerUrl"])
+        self._connect_tab(self.tab)
         cdp.call("Page.enable")
         return {"tab": self.tab.get("id", "")[:12], "url": self.tab.get("url", "")}
 
     def evaluate(self, expression: str):
-        result = self._require().call("Runtime.evaluate", expression=expression,
-                                      returnByValue=True)
+        result = self._call("Runtime.evaluate", expression=expression, returnByValue=True)
         return result.get("result", {}).get("value")
+
+    def status(self) -> dict:
+        """Факты о живой сессии для отчёта и для вопроса «видишь браузер?»:
+        режим, порт и что открыто в рабочей вкладке. Пользовательские вкладки
+        не трогаются: без нашей вкладки просто сообщаем, что её ещё нет."""
+        facts: dict = {"mode": self.mode, "port": self.port,
+                       "tab_url": (self.tab or {}).get("url", "")}
+        if self.mode and self.tab:
+            try:
+                page = self.page_info() or {}
+                facts.update({"url": page.get("url", ""), "title": page.get("title", ""),
+                              "videos": page.get("videos", 0),
+                              "search_inputs": page.get("search_inputs", [])})
+            except Exception as exc:  # noqa: BLE001 — состояние вкладки может быть любым
+                facts["note"] = f"вкладка не отвечает: {type(exc).__name__}"
+        elif self.mode:
+            facts["note"] = "рабочая вкладка ещё не открыта"
+        return facts
 
     def wait_for(self, expression: str, timeout_s: float = 15.0, step_s: float = 0.5) -> bool:
         """Ждёт, пока выражение станет истинным: сетевые страницы ленивы."""
@@ -193,14 +278,13 @@ class LiveBrowser:
         return False
 
     def navigate(self, url: str, load_timeout_s: float = 25.0) -> dict:
-        cdp = self._require()
         if self.mode == "user":
             # В браузере ВЛАДЕЛЬЦА никогда не навигируем в его вкладках:
             # открываем СВОЮ новую вкладку и работаем в ней — его страницы целы.
-            tab = cdp.open_page(url)
+            tab = self._open_page(url)
             self.tab = tab
-            cdp.connect(tab["webSocketDebuggerUrl"])
-            cdp.call("Page.enable")
+            self._connect_tab(tab)
+            self._call("Page.enable")
             loaded = self.wait_for("document.readyState === 'complete'", load_timeout_s)
             return {"url": self.evaluate("location.href"),
                     "title": self.evaluate("document.title") or "",
@@ -208,7 +292,7 @@ class LiveBrowser:
                     "tab": "новая (своя)"}
         if not self.tab:
             self.ensure_tab()
-        cdp.call("Page.navigate", url=url)
+        self._call("Page.navigate", url=url)
         ready = self.wait_for("document.readyState === 'complete'", load_timeout_s)
         return {"url": self.evaluate("location.href"),
                 "title": self.evaluate("document.title") or "",
@@ -353,6 +437,9 @@ class LiveBrowser:
         payload = {"type": "keyDown", "key": key, "code": code or key,
                    "windowsVirtualKeyCode": key_code or ord(key.upper()[0]),
                    "nativeVirtualKeyCode": key_code or ord(key.upper()[0])}
+        # Без авто-повтора: повторное нажатие переключило бы режим обратно
+        # (полный экран). Надёжность даёт постусловие уровня выше — состояние
+        # `document.fullscreenElement` проверяется после каждого шага.
         cdp.call("Input.dispatchKeyEvent", **payload)
         cdp.call("Input.dispatchKeyEvent", **{**payload, "type": "keyUp"})
         return {"ok": True, "key": key}
@@ -386,13 +473,21 @@ class LiveBrowser:
 
     def screenshot(self, path: str, full_page: bool = False) -> dict:
         """Скриншот страницы через CDP (работает и в headless, и в user-режиме)."""
-        cdp = self._require()
+        self._require()  # привязка вкладки до захвата: свой отказ, а не CDP-ошибка
         params = {"format": "png", "captureBeyondViewport": bool(full_page)}
-        result = cdp.call("Page.captureScreenshot", **params)
+        result = self._call("Page.captureScreenshot", **params)
         import base64
 
         target = Path(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(base64.b64decode(result.get("data", "")))
-        return {"ok": target.exists() and target.stat().st_size > 1000,
-                "file": str(target), "bytes": target.stat().st_size if target.exists() else 0}
+        data = base64.b64decode(result.get("data", ""))
+        target.write_bytes(data)
+        written = target.stat().st_size if target.exists() else 0
+        # Пустая страница (about:blank) весит меньше килобайта — это всё равно
+        # состоявшийся снимок; отказом считается только отсутствие данных, и он
+        # ОБЯЗАН быть с причиной (иначе ассистент говорит «неизвестная причина»).
+        outcome = {"file": str(target), "bytes": written, "ok": written > 0}
+        if not written:
+            outcome["reason"] = ("кадр не получен: вкладка не отрисована "
+                                 "(CDP вернул пустые данные)")
+        return outcome

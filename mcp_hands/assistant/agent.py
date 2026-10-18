@@ -90,6 +90,50 @@ def _tool_schemas() -> list[dict]:
     return [spec["schema"] for spec in TOOL_SPECS.values()]
 
 
+#: Сколько знаков о результате инструмента уходит модели (см. tool_payload).
+TOOL_PAYLOAD_LIMIT = 2400
+
+#: Слова-маркеры обрыва связи с браузером (CdpTransportError и его причины):
+#: по ним ассистент отличает «живая сессия умерла» от «инструмент честно отказал».
+TRANSPORT_MARKERS = ("обрыв связи", "связь с вкладкой", "ConnectionAborted",
+                     "ConnectionReset", "не подключён")
+
+
+def transport_lost(outcome: dict) -> bool:
+    """Похоже ли, что причина отказа — потеря связи с браузером."""
+    text = f"{outcome.get('reason', '')} {outcome.get('summary', '')}"
+    return any(marker in text for marker in TRANSPORT_MARKERS)
+
+
+def _shrink(value, keep: int):
+    """Сжимает длинные списки в структуре: модели нужны первые записи, не все."""
+    if isinstance(value, list):
+        return [_shrink(item, keep) for item in value[:keep]]
+    if isinstance(value, dict):
+        return {key: _shrink(item, keep) for key, item in value.items()}
+    return value
+
+
+def tool_payload(outcome: dict, limit: int = TOOL_PAYLOAD_LIMIT) -> str:
+    """Что модель видит о результате инструмента: вердикт И подробности (detail).
+
+    Раньше уходили только вердикт и краткая сводка — и на вопрос «какие окна
+    открыты» модель отвечала, что система вернула одно число: названия лежали
+    в detail и до неё просто не доезжали. Усечение сначала по числу записей
+    в списках, затем по длине строки — факты вместо счётчиков.
+    """
+    detail = outcome.get("detail") or {}
+    head = {"ok": outcome.get("ok"), "summary": outcome.get("summary", ""),
+            "reason": outcome.get("reason", "")}
+    text = json.dumps({**head, "detail": detail}, ensure_ascii=False, default=str)
+    for keep in (12, 6, 3, 1):
+        if len(text) <= limit:
+            break
+        text = json.dumps({**head, "detail": _shrink(detail, keep)},
+                          ensure_ascii=False, default=str)
+    return text if len(text) <= limit else text[:limit] + " (обрезано)"
+
+
 SYSTEM_PROMPT = """Ты — Джарвис, голосовой ассистент владельца на Windows.
 Отвечай КОРОТКО (одна-две фразы) по-русски: твой ответ будет произнесён голосом.
 
@@ -98,6 +142,10 @@ SYSTEM_PROMPT = """Ты — Джарвис, голосовой ассистен�
 - это ДЕЙСТВИЕ на компьютере — выбери подходящий инструмент из доступных и вызови;
 - это СЛОЖНАЯ задача — разложи на шаги и вызывай инструменты последовательно
   (за один раунд можно несколько), проверяй результат по фактам каждого вызова;
+- в ответе инструмента всегда смотри поле detail: там сами факты (названия окон,
+  вкладки, файлы, тексты). Отвечай по ним, а не по одному счётчику из summary;
+- если инструмент отказал — скажи причину и предложи следующий шаг; один и тот же
+  вызов с теми же аргументами дважды не повторяй;
 - не выдумывай инструменты и не обещай того, чего не проверил: если не вышло —
   честно скажи, что именно.
 Помни историю разговора: «а теперь второй», «повтори» относятся к предыдущему."""
@@ -116,6 +164,7 @@ class Assistant:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.force_work = force_work  # приёмка: не трогать живую Opera владельца
         self.keep_history = keep_history
+        self.last_url = ""  # страница, на которой владелец нас оставил
         self.dialogue = Dialogue(self.log_dir / "jarvis_memory.db")
         self.trace: list[dict] = []
 
@@ -148,20 +197,22 @@ class Assistant:
         elif action == "navigate_search":
             outcome = self._ensure_browser(args["url"])
             if outcome.get("ok"):
-                outcome = self._call_tool("live_search", {"query": args["query"]})
+                outcome = self._live("live_search", {"query": args["query"]})
+        elif action == "browser_open":
+            outcome = self._ensure_browser()
         elif action == "search":
             outcome = self._ensure_browser()
             if outcome.get("ok"):
-                outcome = self._call_tool("live_search", args)
+                outcome = self._live("live_search", args)
         elif action == "youtube":
             outcome = self._ensure_browser()
             if outcome.get("ok"):
-                outcome = self._call_tool("live_youtube", {**args, "fullscreen": True})
+                outcome = self._live("live_youtube", {**args, "fullscreen": True})
         elif action in ("video_pause", "video_play", "video_fullscreen", "video_exit"):
-            outcome = self._call_tool("live_video", {"action": action.split("_", 1)[1]})
+            outcome = self._live("live_video", {"action": action.split("_", 1)[1]})
         elif action == "screenshot":
             target = str(self.log_dir / time.strftime("shot_%H%M%S.png"))
-            outcome = self._call_tool("live_screenshot", {"path": target})
+            outcome = self._live("live_screenshot", {"path": target})
         elif action == "video_next":
             outcome = {"ok": False, "reason": "переключение видео пока не подключено"}
         else:
@@ -176,9 +227,45 @@ class Assistant:
                          for step in (outcome.get("steps") or [])])
         return {"handled": True, "say": say, "detail": {"action": action, **outcome}}
 
-    def _ensure_browser(self, url: str = "") -> dict:
+    def _live(self, tool: str, args: dict) -> dict:
+        """Живой вызов с самолечением: обрыв связи → переподключение → повтор,
+        а если и это не помогло — браузер поднимается заново и команда идёт снова.
+
+        Владелец разговаривает с ассистентом минутами, и за это время живая
+        сессия Opera может умереть: закрыли вкладку, уснул ноутбук, лёг процесс.
+        Раньше сцена разваливалась на «WinError 10053»; теперь сначала
+        перепривязываемся к вкладке (мягко), затем снимаем сессию и стартуем
+        браузер заново (жёстко), и только после этого честно отказываем.
+        """
+        outcome = self._call_tool(tool, args)
+        if outcome.get("ok") or not transport_lost(outcome):
+            return outcome
+        self._log("browser_reconnect", tool=tool, reason=str(outcome.get("reason"))[:160])
+        revived = self._ensure_browser()
+        if revived.get("ok"):
+            retry = self._call_tool(tool, args)
+            if retry.get("ok") or not transport_lost(retry):
+                self._log("browser_reconnected", tool=tool)
+                return retry
+        self._log("browser_restart", tool=tool)
+        fresh = self._ensure_browser(restart=True)
+        if not fresh.get("ok"):
+            return {"ok": False, "reason": "связь с браузером потеряна и поднять заново "
+                                           "не удалось: " + str(fresh.get("reason"))[:120]}
+        if self.last_url and tool != "live_navigate":
+            # перезапуск открывает пустую вкладку: возвращаем владельца на ту страницу,
+            # где его застал обрыв, иначе «пауза»/«скриншот» уйдут в about:blank
+            restored = self._call_tool("live_navigate", {"url": self.last_url})
+            self._log("browser_restored_page", url=self.last_url, ok=restored.get("ok"))
+        return self._call_tool(tool, args)
+
+    def _ensure_browser(self, url: str = "", restart: bool = False) -> dict:
         """Живой браузер: к ЖИВОЙ Opera владельца, если открыт порт; иначе свой.
-        При `force_work` (приёмка/тесты) — всегда свой невидимый экземпляр."""
+        При `force_work` (приёмка/тесты) — всегда свой невидимый экземпляр, а в
+        голосовом сценарии свой запускается ВИДИМЫМ: владелец должен видеть, что
+        происходит на экране. `restart` сначала снимает мёртвую сессию."""
+        if restart:
+            self._call_tool("live_browser", {"action": "stop"})
         status = self._call_tool("live_browser", {"action": "status"})
         mode = (status.get("detail") or {}).get("mode") if status.get("ok") else ""
         if not mode:
@@ -188,16 +275,19 @@ class Assistant:
             if not connected.get("ok"):
                 connected = self._call_tool("live_browser",
                                             {"action": "start", "profile": "work",
-                                             "headless": True})
+                                             "headless": bool(self.force_work)})
             if not connected.get("ok"):
                 return connected
         if url:
-            return self._call_tool("live_navigate", {"url": url})
+            outcome = self._live("live_navigate", {"url": url})
+            if outcome.get("ok"):
+                self.last_url = url  # куда вернуть владельца после перезапуска
+            return outcome
         return {"ok": True}
 
     # --- старший мозг -------------------------------------------------------
 
-    def run_smart(self, text: str, max_rounds: int = 5) -> dict:
+    def run_smart(self, text: str, max_rounds: int = 8) -> dict:
         """Сложная фраза: GLM с инструментами, исполнение вызовов, финальная речь."""
         messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
                     + self.dialogue.history(self.keep_history)
@@ -229,16 +319,25 @@ class Assistant:
                 used.append({"tool": call["name"], "args": arguments,
                              "ok": outcome.get("ok"), "reason": outcome.get("reason", "")})
                 messages.append({"role": "tool", "tool_call_id": call["id"],
-                                 "content": json.dumps(
-                                     {"ok": outcome.get("ok"),
-                                      "summary": outcome.get("summary", ""),
-                                      "reason": outcome.get("reason", "")},
-                                     ensure_ascii=False)})
-        self.dialogue.remember("user", text)
-        self.dialogue.remember("assistant", "Не удалось завершить за отведённые шаги.",
-                               kind="smart")
+                                 "content": tool_payload(outcome)})
         self._log("smart", text=text, exhausted=True, used=used)
-        return {"say": "Не удалось завершить за отведённые шаги.", "detail": {"used": used}}
+        say = self._final_say(messages)
+        self.dialogue.remember("user", text)
+        self.dialogue.remember("assistant", say, kind="smart")
+        return {"say": say, "detail": {"used": used, "exhausted": True}}
+
+    def _final_say(self, messages: list[dict]) -> str:
+        """Шаги кончились: просим модель ответить БЕЗ инструментов по уже собранным
+        фактам. Раньше владелец слышал только «Не удалось завершить за отведённые
+        шаги» — теперь хотя бы отчёт о том, что получилось."""
+        messages = messages + [{"role": "user", "content": (
+            "Шаги закончились. Одной-двумя фразами скажи, что удалось и что нет — "
+            "только по фактам выше, без новых вызовов инструментов.")}]
+        try:
+            final = _post_chat(self.config, messages)
+        except LLMError:
+            return "Не удалось завершить за отведённые шаги."
+        return (final.text or "").strip() or "Не удалось завершить за отведённые шаги."
 
     def handle(self, text: str) -> dict:
         """Полный маршрут: локальный интент → старший мозг. Возвращает {"say", "kind"}."""

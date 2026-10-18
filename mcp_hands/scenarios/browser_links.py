@@ -56,6 +56,20 @@ def edge_path() -> str | None:
     return None
 
 
+class CdpTransportError(RuntimeError):
+    """Обрыв связи с отладочной точкой (вкладка закрыта, браузер перезапущен).
+
+    Отдельный класс нужен живому слою: это не ошибка сценария, а состояние
+    соединения — его лечат переподключением, а не отказом пользователю.
+    """
+
+
+#: Разрыв соединения: команда не дошла (или ушла в мёртвый сокет) — повторяем.
+_RETRY_ERRORS = (websocket.WebSocketConnectionClosedException, ConnectionError, EOFError)
+#: Любой отказ канала связи: наружу он выходит только как CdpTransportError.
+_LINK_ERRORS = (OSError, websocket.WebSocketException, json.JSONDecodeError)
+
+
 class Cdp:
     """Минимальный клиент протокола: одна сессия страницы, вызовы команд."""
 
@@ -63,6 +77,7 @@ class Cdp:
         self.port = port
         self.timeout_s = timeout_s
         self.ws = None
+        self.ws_url = ""  # адрес сессии: по нему переподключаемся после разрыва
         self.counter = 0
 
     def endpoint(self, path: str = "/json/version") -> dict:
@@ -78,7 +93,7 @@ class Cdp:
             except Exception as exc:  # noqa: BLE001 — порт поднимается не мгновенно
                 last = str(exc)
                 time.sleep(0.3)
-        raise TimeoutError(f"отладочный порт Edge не поднялся: {last}")
+        raise TimeoutError(f"отладочный порт браузера не поднялся: {last}")
 
     def open_page(self, url: str, attempts: int = 8) -> dict:
         """Открывает вкладку и возвращает её отладочную точку.
@@ -105,8 +120,35 @@ class Cdp:
         # принимается независимо от настроек --remote-allow-origins.
         self.ws = websocket.create_connection(ws_url, timeout=self.timeout_s,
                                               suppress_origin=True)
+        self.ws_url = ws_url
 
     def call(self, method: str, **params) -> dict:
+        """Команда протокола. Разрыв соединения лечится ОДНИМ переподключением:
+        без этого одиночный сетевой сбой (WinError 10053 из лога владельца) убивал
+        живую сцену целиком. Таймаут отклика НЕ повторяем: команда могла уже
+        исполниться в браузере (нажатие клавиши, отправка формы)."""
+        try:
+            return self._exchange(method, params)
+        except _RETRY_ERRORS as exc:
+            if not self._reopen():
+                raise CdpTransportError(
+                    f"обрыв связи с вкладкой ({type(exc).__name__}: {exc})") from exc
+            try:
+                return self._exchange(method, params)
+            except _LINK_ERRORS as second:
+                self._drop()
+                raise CdpTransportError(
+                    f"обрыв связи: повтор команды не удался "
+                    f"({type(second).__name__}: {second})") from second
+        except _LINK_ERRORS as exc:
+            self._drop()
+            raise CdpTransportError(
+                f"обрыв связи: браузер не ответил по протоколу "
+                f"({type(exc).__name__}: {exc})") from exc
+
+    def _exchange(self, method: str, params: dict) -> dict:
+        if self.ws is None:
+            raise CdpTransportError("соединение с браузером не открыто")
         self.counter += 1
         self.ws.send(json.dumps({"id": self.counter, "method": method, "params": params}))
         while True:
@@ -116,13 +158,32 @@ class Cdp:
                     raise RuntimeError(f"CDP {method}: {message['error']}")
                 return message.get("result", {})
 
-    def close(self) -> None:
+    def _reopen(self) -> bool:
+        """Переподключение к тому же адресу сессии (адрес хранит `connect`)."""
+        if not self.ws_url:
+            return False
+        self._drop()
+        try:
+            self.ws = websocket.create_connection(self.ws_url, timeout=self.timeout_s,
+                                                  suppress_origin=True)
+            return True
+        except Exception:  # noqa: BLE001 — адрес мёртв: решает вызывающий уровень
+            self._drop()
+            return False
+
+    def _drop(self) -> None:
+        """Закрывает сокет, НЕ забывая адрес: по нему возможен повтор."""
+        self.close(keep_url=True)
+
+    def close(self, keep_url: bool = False) -> None:
         if self.ws is not None:
             try:
                 self.ws.close()
             except Exception:  # noqa: BLE001
                 pass
             self.ws = None
+        if not keep_url:
+            self.ws_url = ""
 
 
 def kill_our_browsers(profile: Path) -> int:

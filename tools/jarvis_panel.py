@@ -1,8 +1,9 @@
 """Панель Джарвиса: настройка и проверка в одном окне (tkinter).
 
 Слева — микрофон (список, тест уровня, сохранение выбора), справа — голос
-(провайдер, голоса, прослушивание, скорость/тон, сохранение). Внизу — быстрые
-проверки (распознавание речи, статус живой Opera) и запуск самого Джарвиса.
+(провайдер, голоса, прослушивание, скорость/тон, сохранение). Внизу — режим
+разговора (подряд / одна фраза на нажатие, пауза до засыпания), быстрые проверки
+(распознавание речи, статус живой Opera) и запуск самого Джарвиса.
 
 Интерфейс не блокируется: запись, синтез и сетевые списки голосов идут в
 рабочих потоках, а результат возвращается в окно через очередь.
@@ -24,7 +25,7 @@ from tkinter import messagebox, ttk
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from mcp_hands.assistant import mic, tts  # noqa: E402
+from mcp_hands.assistant import mic, session, tts  # noqa: E402
 
 DEMO_PHRASE = "Джарвис на связи. Включаю свежие новости и разворачиваю на весь экран."
 
@@ -111,12 +112,24 @@ class Panel(tk.Tk):
         # --- проверки и запуск
         checks = ttk.LabelFrame(self, text="Проверки и запуск")
         checks.pack(fill="x", padx=12, pady=10)
-        ttk.Button(checks, text="Проверить распознавание (скажи фразу)",
+        row1 = ttk.Frame(checks)
+        row1.pack(fill="x")
+        ttk.Button(row1, text="Проверить распознавание (скажи фразу)",
                    command=self._test_stt).pack(side="left", padx=8, pady=6)
-        ttk.Button(checks, text="Статус живой Opera",
+        ttk.Button(row1, text="Статус живой Opera",
                    command=self._test_live).pack(side="left", padx=6)
-        ttk.Button(checks, text="Запустить Джарвиса (Ctrl+Alt+J)",
+        ttk.Button(row1, text="Запустить Джарвиса",
                    command=self._start_jarvis).pack(side="left", padx=6)
+        row2 = ttk.Frame(checks)
+        row2.pack(fill="x", padx=8, pady=(0, 6))
+        self.continuous = tk.BooleanVar(value=True)
+        ttk.Checkbutton(row2, text="разговор подряд: одна Ctrl+Alt+J включает микрофон",
+                        variable=self.continuous).pack(side="left")
+        ttk.Label(row2, text="   засыпаю после паузы, с:").pack(side="left")
+        self.sleep_after = ttk.Entry(row2, width=5)
+        self.sleep_after.insert(0, str(int(session.sleep_after_seconds(tts.load_config()))))
+        self.sleep_after.pack(side="left", padx=4)
+        ttk.Label(row2, text="(«стоп» или повторная Ctrl+Alt+J — тоже сон)").pack(side="left")
         self.checks_status = ttk.Label(self, text="", wraplength=820)
         self.checks_status.pack(fill="x", padx=14, pady=(0, 8))
 
@@ -286,9 +299,24 @@ class Panel(tk.Tk):
         self._run("live", work)
 
     def _start_jarvis(self) -> None:
-        subprocess.Popen([sys.executable, "-u", str(ROOT / "tools" / "jarvis.py")],
-                         creationflags=subprocess.CREATE_NEW_CONSOLE)
-        self._run("saved", lambda: {"note": "Джарвис запущен в отдельном окне: Ctrl+Alt+J — говорить."})
+        """Запуск с выбранным режимом: непрерывный разговор или одна фраза на нажатие."""
+        continuous = bool(self.continuous.get())
+        try:
+            pause = session.sleep_after_seconds({"sleep_after_s": float(self.sleep_after.get())})
+        except ValueError:
+            pause = session.sleep_after_seconds(tts.load_config())
+            self.sleep_after.delete(0, "end")
+            self.sleep_after.insert(0, str(int(pause)))
+        tts.save_config({"sleep_after_s": pause})  # тот же режим и для jarvis.bat
+        command = [sys.executable, "-u", str(ROOT / "tools" / "jarvis.py"),
+                   "--sleep-after", str(int(pause))]
+        if not continuous:
+            command.append("--once")
+        subprocess.Popen(command, creationflags=subprocess.CREATE_NEW_CONSOLE)
+        mode = (f"разговор подряд, пауза до сна {pause:.0f} с" if continuous
+                else "одна фраза на нажатие")
+        self._run("saved", lambda: {"note": f"Джарвис запущен в отдельном окне "
+                                             f"({mode}). Ctrl+Alt+J — говорить."})
 
 
 def main() -> int:
