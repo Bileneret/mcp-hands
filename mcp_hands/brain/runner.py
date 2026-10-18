@@ -82,6 +82,7 @@ class StepOutcome:
     expect_kind: str = ""
     expect_ok: bool = False
     evidence: str = ""
+    disputed: bool = False  # L1 и L2 разошлись (этап 4)
 
 
 @dataclass
@@ -101,7 +102,7 @@ class PlanRun:
                 "steps": [{"index": s.index, "action": s.action, "ok": s.ok,
                            "attempts": s.attempts, "expect": s.expect_kind,
                            "expect_ok": s.expect_ok, "ignored_args": s.ignored_args,
-                           "reason": s.reason} for s in self.steps],
+                           "disputed": s.disputed, "reason": s.reason} for s in self.steps],
                 "total_ms": round(self.total_ms, 1), "replans": self.replans,
                 "cumulative_tokens": self.cumulative_tokens}
 
@@ -207,8 +208,51 @@ def _check_expect(kind: str, params: dict) -> tuple[bool, str]:
     return False, f"runner не поддерживает kind {kind!r}"
 
 
+def _artifact_path(result: ToolResult) -> str | None:
+    """Путь артефакта шага из detail результата (file/saved), если расширение
+    поддерживается L2-инспектором (docx/xlsx/pdf)."""
+    detail = result.detail if isinstance(result.detail, dict) else {}
+    candidates = []
+    for key in ("file", "saved", "path"):
+        value = detail.get(key)
+        if isinstance(value, str) and value:
+            candidates.append(value)
+    for candidate in candidates:
+        if Path(candidate).suffix.lower() in (".docx", ".xlsx", ".pdf"):
+            return candidate
+    return None
+
+
+def _verify_step_artifact(result: ToolResult, verifier, outcome: StepOutcome) -> dict | None:
+    """L2-арбитраж успешного шага. None — инспектор неприменим (нет артефакта)."""
+    path = _artifact_path(result)
+    if path is None:
+        return None
+    try:
+        report = verifier(path)
+    except Exception as exc:  # noqa: BLE001 — отказ инспектора = расхождение
+        return {"ok": False, "reason": f"инспектор не смог прочитать {path}: "
+                                       f"{type(exc).__name__}: {str(exc)[:120]}"}
+    evidence = f"sha {report.get('sha256', '')[:12]}"
+    ok = True
+    if report.get("kind") in ("docx", "pdf") and not (report.get("text_sample") or "").strip():
+        ok = False
+        evidence += "; документ пуст для независимого парсера"
+    if report.get("kind") == "xlsx":
+        cells = report.get("cells") or {}
+        nonempty = sum(1 for value in cells.values() if str(value).strip())
+        if nonempty == 0:
+            ok = False
+            evidence += "; лист пуст для независимого парсера"
+        else:
+            evidence += f"; ячеек с данными: {nonempty}"
+    outcome.evidence = (outcome.evidence + "; " + evidence).strip("; ")
+    return {"ok": ok, "evidence": evidence, "reason": "" if ok else evidence}
+
+
 def run_plan(plan: Plan, limits: RunnerLimits | None = None,
-             llm_request_plan=None, memory=None, plan_source: str = "scripted") -> PlanRun:
+             llm_request_plan=None, memory=None, plan_source: str = "scripted",
+             verifier=None) -> PlanRun:
     """Исполняет план по шагам (замкнутый цикл).
 
     `llm_request_plan(plan, failed_outcome) -> Plan | None` — необязательный
@@ -219,6 +263,12 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
 
     `memory` — `mcp_hands.memory.Memory`: тогда каждый шаг (включая провальные),
     инциденты стража и итог прогона попадают в SQLite (провалы не прячутся).
+
+    `verifier` — L2-инспектор этапа 4 (`brain.inspector.inspect_artifact`):
+    после успешного шага проверяет артефакт БЕЗ доверия COM (zipfile/XML/хэш).
+    Расхождение первого и второго мнения помечает шаг `disputed` — это инцидент,
+    а повторами не лечится. Артефакт берётся из `detail` результата (поля
+    `file`/`saved` с расширением docx/xlsx/pdf).
 
     Каждый шаг: попытки (бюджет `attempts_per_step`), попытка = вызов инструмента
     (фильтр args) →ToolResult.ok → проверка `expect` против реального мира.
@@ -267,16 +317,29 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
                 evidence = result.summary
             outcome.expect_ok = expect_ok
             outcome.evidence = evidence
-            if expect_ok:
-                outcome.ok = True
-                outcome.reason = ""
-                break
-            outcome.reason = f"постусловие {step.expect.kind} не наступило: {evidence}"
+            if not expect_ok:
+                outcome.reason = f"постусловие {step.expect.kind} не наступило: {evidence}"
+                continue
+            if verifier is not None:
+                l2 = _verify_step_artifact(result, verifier, outcome)
+                if l2 is None:
+                    pass  # артефакта для L2 нет — шаг подтверждён только L1
+                elif not l2["ok"]:
+                    outcome.reason = f"L2 расхождение: {l2.get('reason', '')}"
+                    outcome.disputed = True
+                    break
+                else:
+                    outcome.evidence = (outcome.evidence + "; L2: " + l2["evidence"]).strip("; ")
+            outcome.ok = True
+            outcome.reason = ""
+            break
         outcome.ms = (time.perf_counter() - step_started) * 1000.0
         run.steps.append(outcome)
         if memory is not None:
             memory.record_step(run_id, outcome)
-            if not outcome.ok and (outcome.reason or "").startswith("постусловие"):
+            if outcome.disputed:
+                memory.record_incident(run_id, "l2_disputed", step.action, outcome.reason)
+            elif not outcome.ok and (outcome.reason or "").startswith("постусловие"):
                 memory.record_incident(run_id, "expect_failed", step.action, outcome.reason)
         if outcome.ok:
             position += 1
