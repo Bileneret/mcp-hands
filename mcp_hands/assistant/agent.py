@@ -21,76 +21,102 @@ from pathlib import Path
 from ..brain.llm import LLMConfig, LLMError, _post_chat, load_config
 from .router import route
 
-#: Белый список инструментов ассистента: имя → (функция, описание, схема аргументов)
+#: Каталог инструментов ассистента: строится АВТОМАТИЧЕСКИ из канона сервера
+#: (TOOL_NAMES) — описание из докстринга, схема аргументов из аннотаций сигнатуры.
+#: Ручной список был узким; расширять канон теперь достаточно в одном месте.
 TOOL_SPECS: dict[str, dict] = {}
 
+_TYPE_MAP = {str: "string", int: "integer", float: "number", bool: "boolean",
+             list: "array", dict: "object"}
+_STRING_TYPES = {"str": str, "int": int, "float": float, "bool": bool,
+                 "list": list, "dict": dict}
 
-def _register(name: str, description: str, properties: dict, required: list[str]):
-    from .. import mcp_server
 
-    TOOL_SPECS[name] = {
-        "function": getattr(mcp_server, name),
-        "schema": {"type": "function", "function": {
-            "name": name, "description": description,
-            "parameters": {"type": "object", "properties": properties,
-                           "required": required}}},
-    }
+def _schema_property(annotation) -> dict:
+    """Тип параметра для LLM. Аннотации в модулях «отложены» (from __future__),
+    поэтому строковые имена ('bool', 'list[str]') разрешаются вручную."""
+    if isinstance(annotation, str):
+        text_name = annotation.strip()
+        if text_name.startswith("list"):
+            return {"type": "array", "items": {"type": "string"}}
+        if text_name.startswith("dict"):
+            return {"type": "object"}
+        annotation = _STRING_TYPES.get(text_name, annotation)
+    if annotation in _TYPE_MAP:
+        base = _TYPE_MAP[annotation]
+        if base == "array":
+            return {"type": "array", "items": {"type": "string"}}
+        return {"type": base}
+    return {"type": "string"}  # Optional/иные — строка, уточнение на стороне модели
 
 
 def _build_registry() -> None:
+    """Каталог = канон MCP-сервера; схемы выводятся из живых сигнатур функций."""
     if TOOL_SPECS:
         return
-    _register("live_browser", "Живой браузер Opera: start (свой профиль, "
-              "headless) / connect_user (живая Opera владельца) / stop / status.",
-              {"action": {"type": "string"}, "profile": {"type": "string"},
-               "headless": {"type": "boolean"}}, ["action"])
-    _register("live_navigate", "Перейти по адресу в живом браузере.",
-              {"url": {"type": "string"}}, ["url"])
-    _register("live_page", "Что сейчас на странице: адрес, заголовок, поля поиска.",
-              {}, [])
-    _register("live_search", "Напечатать запрос в поиске текущей страницы.",
-              {"query": {"type": "string"}}, ["query"])
-    _register("live_click_text", "Клик по элементу страницы с заданным текстом.",
-              {"text": {"type": "string"}}, ["text"])
-    _register("live_video", "Видео на странице: status/play/pause/fullscreen/exit.",
-              {"action": {"type": "string"}}, ["action"])
-    _register("live_screenshot", "Скриншот страницы (PNG-файл).",
-              {"path": {"type": "string"}}, [])
-    _register("live_youtube", "Найти видео по запросу на YouTube и включить "
-              "(по флагу — на весь экран).",
-              {"query": {"type": "string"}, "fullscreen": {"type": "boolean"}},
-              ["query"])
-    _register("windows_list", "Список открытых окон (hwnd, процесс, заголовок).",
-              {}, [])
-    _register("element_find", "Найти элемент в окне по имени/типу (UIA).",
-              {"hwnd": {"type": "integer"}, "name": {"type": "string"},
-               "control_type": {"type": "string"}}, ["hwnd"])
-    _register("element_text", "Прочитать текст окна через TextPattern.",
-              {"hwnd": {"type": "integer"}}, ["hwnd"])
+    import inspect
+
+    from .. import mcp_server
+
+    for name in sorted(mcp_server.TOOL_NAMES):
+        function = getattr(mcp_server, name, None)
+        if function is None or not callable(function):
+            continue
+        doc = (function.__doc__ or "").strip().splitlines()
+        description = doc[0] if doc else name
+        properties: dict = {}
+        required: list[str] = []
+        try:
+            signature = inspect.signature(function)
+        except (TypeError, ValueError):
+            signature = None
+        if signature is not None:
+            for parameter in signature.parameters.values():
+                if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD):
+                    continue
+                properties[parameter.name] = _schema_property(parameter.annotation)
+                if parameter.default is inspect.Parameter.empty:
+                    required.append(parameter.name)
+        TOOL_SPECS[name] = {
+            "function": function,
+            "schema": {"type": "function", "function": {
+                "name": name, "description": description,
+                "parameters": {"type": "object", "properties": properties,
+                               "required": required}}}}
 
 
 def _tool_schemas() -> list[dict]:
+    """Схемы для LLM: весь каталог ассистента (белый список = канон сервера)."""
     return [spec["schema"] for spec in TOOL_SPECS.values()]
 
 
 SYSTEM_PROMPT = """Ты — Джарвис, голосовой ассистент владельца на Windows.
 Отвечай КОРОТКО (одна-две фразы) по-русски: твой ответ будет произнесён голосом.
-Управляй компьютером ТОЛЬКО через предоставленные инструменты; никогда не выдумывай их.
-Если нужен живой браузер — сначала live_browser(action="start"), затем навигация.
-Для «найди видео X и включи» используй live_youtube.
-Факты проверяй по результатам инструментов и говори честно, если не получилось."""
+
+Как работать:
+- это ВОПРОС или разговор — отвечай сам, без инструментов;
+- это ДЕЙСТВИЕ на компьютере — выбери подходящий инструмент из доступных и вызови;
+- это СЛОЖНАЯ задача — разложи на шаги и вызывай инструменты последовательно
+  (за один раунд можно несколько), проверяй результат по фактам каждого вызова;
+- не выдумывай инструменты и не обещай того, чего не проверил: если не вышло —
+  честно скажи, что именно.
+Помни историю разговора: «а теперь второй», «повтори» относятся к предыдущему."""
 
 
 class Assistant:
     """Один сеанс Джарвиса: держит живой браузер и конфиг мозга."""
 
     def __init__(self, config: LLMConfig | None = None, log_dir: Path | None = None,
-                 force_work: bool = False) -> None:
+                 force_work: bool = False, keep_history: int = 8) -> None:
+        from .dialogue import Dialogue
+
         _build_registry()
         self.config = config or load_config()
         self.log_dir = log_dir or Path(__file__).resolve().parents[2] / "logs" / "assistant"
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.force_work = force_work  # приёмка: не трогать живую Opera владельца
+        self.keep_history = keep_history
+        self.dialogue = Dialogue(self.log_dir / "jarvis_memory.db")
         self.trace: list[dict] = []
 
     def _log(self, kind: str, **fields) -> None:
@@ -142,6 +168,8 @@ class Assistant:
             outcome = {"ok": False, "reason": f"неизвестный интент {action}"}
         say = intent["say"] if outcome.get("ok") else (
             "Не вышло: " + (outcome.get("reason") or "неизвестная причина")[:120])
+        self.dialogue.remember("user", text)
+        self.dialogue.remember("assistant", say, kind="local")
         self._log("local_intent", text=text, action=action, ok=outcome.get("ok"),
                   reason=outcome.get("reason", "")[:160],
                   steps=[{k: step.get(k) for k in ("step", "ok", "how", "found")}
@@ -171,8 +199,9 @@ class Assistant:
 
     def run_smart(self, text: str, max_rounds: int = 5) -> dict:
         """Сложная фраза: GLM с инструментами, исполнение вызовов, финальная речь."""
-        messages = [{"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": text}]
+        messages = ([{"role": "system", "content": SYSTEM_PROMPT}]
+                    + self.dialogue.history(self.keep_history)
+                    + [{"role": "user", "content": text}])
         used: list[dict] = []
         for _round in range(max_rounds):
             try:
@@ -181,6 +210,8 @@ class Assistant:
                 self._log("smart", text=text, transport_error=str(exc))
                 return {"say": "Связь с мозгом недоступна.", "detail": {"error": str(exc)}}
             if not response.tool_calls:
+                self.dialogue.remember("user", text)
+                self.dialogue.remember("assistant", response.text or "Готово.", kind="smart")
                 self._log("smart", text=text, say=response.text[:160], used=used)
                 return {"say": response.text or "Готово.", "detail": {"used": used}}
             messages.append({"role": "assistant", "content": response.text or "",
@@ -203,6 +234,9 @@ class Assistant:
                                       "summary": outcome.get("summary", ""),
                                       "reason": outcome.get("reason", "")},
                                      ensure_ascii=False)})
+        self.dialogue.remember("user", text)
+        self.dialogue.remember("assistant", "Не удалось завершить за отведённые шаги.",
+                               kind="smart")
         self._log("smart", text=text, exhausted=True, used=used)
         return {"say": "Не удалось завершить за отведённые шаги.", "detail": {"used": used}}
 

@@ -50,9 +50,11 @@ def transcribe(audio: np.ndarray) -> dict:
 
 
 def record_until_silence(max_seconds: float = 12.0, initial_timeout_s: float = 6.0,
-                         silence_s: float = 0.8, energy: float = 0.008) -> np.ndarray:
+                         silence_s: float = 0.8, energy: float = 0.008,
+                         device=None) -> np.ndarray:
     """Пишет с микрофона до паузы: речь начинается по порогу энергии, кончается
-    после `silence_s` тишины. Возвращает float32-массив (пустой — если не заговорили)."""
+    после `silence_s` тишины. Возвращает float32-массив (пустой — если не заговорили).
+    `device` — индекс/имя выбранного микрофона (None — системное по умолчанию)."""
     import sounddevice as sd
 
     block = 0.1  # секунды
@@ -60,7 +62,8 @@ def record_until_silence(max_seconds: float = 12.0, initial_timeout_s: float = 6
     speaking = False
     silence_run = 0.0
     waited = 0.0
-    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32") as stream:
+    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32",
+                        device=device) as stream:
         while True:
             chunk, _overflow = stream.read(int(block * SAMPLE_RATE))
             mono = chunk[:, 0]

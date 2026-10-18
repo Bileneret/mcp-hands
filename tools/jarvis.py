@@ -24,9 +24,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
+from mcp_hands.assistant import mic, tts  # noqa: E402
 from mcp_hands.assistant.agent import Assistant  # noqa: E402
 from mcp_hands.assistant.overlay import Indicator  # noqa: E402
-from mcp_hands.assistant.voice import record_until_silence, speak, transcribe  # noqa: E402
+from mcp_hands.assistant.voice import record_until_silence, transcribe  # noqa: E402
+
+
+def say(text: str) -> None:
+    """Ответ голосом по выбору из конфига (piper/edge/windows); при сбое — запасной."""
+    try:
+        tts.speak(text)
+    except Exception as exc:  # noqa: BLE001 — голос не должен ломать ассистента
+        print(f"!! голос не сработал ({exc}); говорю системным")
+        try:
+            tts.speak(text, {"provider": "windows", "voice": "Microsoft Irina"})
+        except Exception:  # noqa: BLE001
+            print("(ответ не озвучен)")
 
 HOTKEY_ID = 0xA70F
 MOD_ALT, MOD_CONTROL = 0x0001, 0x0002
@@ -56,10 +69,13 @@ def worker(assistant: Assistant, indicator: Indicator) -> None:
         if event == "stop":
             return
         indicator.set("listening")
-        audio = record_until_silence()
+        device, note = mic.resolve_device()
+        if note and "по умолчанию" not in note and "выбранный" not in note:
+            print(f"!! {note}")
+        audio = record_until_silence(device=device)
         if audio.size == 0 or len(audio) / 16000 < 0.3:
             indicator.set("talking", "Не услышал")
-            speak("Не услышал, повторите.")
+            say("Не услышал, повторите.")
             indicator.set("idle")
             continue
         indicator.set("thinking")
@@ -68,14 +84,14 @@ def worker(assistant: Assistant, indicator: Indicator) -> None:
         print(f"[{time.strftime('%H:%M:%S')}] вы: {text!r} ({heard['ms']} мс)")
         if not text:
             indicator.set("talking", "Пустая фраза")
-            speak("Не разобрал слова.")
+            say("Не разобрал слова.")
             indicator.set("idle")
             continue
         indicator.set("working", text[:40])
         result = assistant.handle(text)
         print(f"    джарвис: {result['say'][:120]} ({result['kind']})")
         indicator.set("talking", result["say"][:42])
-        speak(result["say"])
+        say(result["say"])
         time.sleep(0.6)
         indicator.set("idle")
 
@@ -91,7 +107,7 @@ def main() -> int:
         text = argv[argv.index("--say") + 1]
         result = assistant.handle(text)
         print(f"вы: {text!r}\nджарвис: {result['say']} ({result['kind']})")
-        speak(result["say"])
+        say(result["say"])
         return 0 if result["kind"] else 1
     if "--wav" in argv:
         from mcp_hands.assistant.voice import wav_to_audio
@@ -101,9 +117,12 @@ def main() -> int:
         print(f"распознано ({heard['ms']} мс): {heard['text']!r}")
         result = assistant.handle(heard["text"])
         print(f"джарвис: {result['say']} ({result['kind']})")
-        speak(result["say"])
+        say(result["say"])
         return 0 if result["kind"] else 1
 
+    device_note = mic.resolve_device()[1]
+    choice = tts.current_choice()
+    print(f"Голос: {choice['provider']} / {choice['voice']}; микрофон: {device_note}")
     indicator = Indicator()
     indicator.start()
     threading.Thread(target=hotkey_listener, daemon=True, name="jarvis-hotkey").start()
