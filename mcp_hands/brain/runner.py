@@ -28,7 +28,9 @@ from ..mcp_server import (browser_collect_sources, browser_extract_text,
                           browser_links_run, browser_tabs_audit, browser_video_capture,
                           click_node, content_map, element_find, element_text,
                           excel_workbook_build, fs_sort_by_type, fs_trash_move, health,
-                          hotkey, notepad_run, ocr_window, type_text, window_activate,
+                          hotkey, live_browser, live_click_text, live_navigate, live_page,
+                          live_screenshot, live_search, live_video, live_youtube,
+                          notepad_run, ocr_window, type_text, window_activate,
                           windows_list, word_docx_to_pdf, word_format_document,
                           word_pdf_run, word_report_from_template)
 from ..checkpoints import CheckpointStore
@@ -67,6 +69,14 @@ DISPATCH_TABLE: dict[str, object] = {
     "browser_extract_text": browser_extract_text,
     "word_docx_to_pdf": word_docx_to_pdf,
     "browser_video_capture": browser_video_capture,
+    "live_browser": live_browser,
+    "live_navigate": live_navigate,
+    "live_page": live_page,
+    "live_search": live_search,
+    "live_click_text": live_click_text,
+    "live_video": live_video,
+    "live_screenshot": live_screenshot,
+    "live_youtube": live_youtube,
 }
 
 assert set(DISPATCH_TABLE) == set(TOOL_NAMES), (

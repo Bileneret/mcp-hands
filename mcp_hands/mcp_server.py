@@ -45,7 +45,9 @@ TOOL_NAMES = frozenset({
     "fs_trash_move", "fs_sort_by_type",
     "word_report_from_template", "word_format_document", "excel_workbook_build",
     "browser_tabs_audit", "browser_collect_sources",
-    "browser_extract_text", "word_docx_to_pdf", "browser_video_capture"})
+    "browser_extract_text", "word_docx_to_pdf", "browser_video_capture",
+    "live_browser", "live_navigate", "live_page", "live_search",
+    "live_click_text", "live_video", "live_screenshot", "live_youtube"})
 
 server = MCPServer(
     name="mcp-hands",
@@ -981,6 +983,212 @@ def browser_video_capture(url: str, output_json: str, output_notes: str,
                         detail=outcome)
     _journal("browser_video_capture", started, result, {"url": url})
     return result
+
+
+# --- живые сценарии (настоящий браузер по CDP: Opera GX, живой веб) ---------------
+
+_live_browser = None
+
+
+def _live():
+    """Одна живая сессия на процесс сервера (рабочий или пользовательский профиль)."""
+    global _live_browser
+    if _live_browser is None:
+        from .live import LiveBrowser
+
+        _live_browser = LiveBrowser()
+    return _live_browser
+
+
+@server.tool(structured_output=True)
+def live_browser(action: str = "start", profile: str = "work",
+                 headless: bool = True) -> ToolResult:
+    """Живой браузер (Opera GX) под CDP: start (свой профиль) / connect_user
+    (ЖИВАЯ Opera владельца с отладочным портом — запускается его лончером;
+    наш сервер её не перезапускает и не закрывает) / stop / status.
+
+    Управление протоколом: навигация, поиск, DOM-клики, видео, полный экран,
+    скриншот. Браузер владельца без отладочного порта не трогается вовсе.
+    """
+    started = time.perf_counter()
+    browser = _live()
+    try:
+        if action == "start":
+            if profile == "user":
+                outcome = browser.connect_user()
+            else:
+                outcome = {**browser.start_work(headless=headless), "ok": True}
+                browser.ensure_tab()
+        elif action == "connect_user":
+            outcome = browser.connect_user()
+        elif action == "stop":
+            outcome = {**browser.stop(), "ok": True}
+        elif action == "status":
+            outcome = {"ok": True, "mode": browser.mode, "port": browser.port}
+        else:
+            return _fail("live_browser", started, f"неизвестное действие {action!r}", True)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_browser", started, f"{type(exc).__name__}: {exc}")
+    ok = bool(outcome.get("ok", True))
+    result = ToolResult(ok=ok, refused=False, reason=outcome.get("reason", ""),
+                        summary=f"живой браузер: {action} ({outcome.get('mode', profile)})",
+                        detail=outcome)
+    _journal("live_browser", started, result, {"action": action, "profile": profile})
+    return result
+
+
+def _live_result(tool: str, started: float, outcome: dict, summary: str) -> ToolResult:
+    result = ToolResult(ok=bool(outcome.get("ok")), refused=False,
+                        reason=outcome.get("reason", ""), summary=summary,
+                        detail=outcome)
+    _journal(tool, started, result, {})
+    return result
+
+
+@server.tool(structured_output=True)
+def live_navigate(url: str) -> ToolResult:
+    """Перейти по адресу в живом браузере (реальный сайт)."""
+    started = time.perf_counter()
+    try:
+        outcome = _live().navigate(url)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_navigate", started, f"{type(exc).__name__}: {exc}")
+    return _live_result("live_navigate", started, {**outcome, "ok": bool(outcome.get("title"))},
+                        f"открыто: {outcome.get('title', '')[:60]}")
+
+
+@server.tool(structured_output=True)
+def live_page() -> ToolResult:
+    """Что сейчас на странице живого браузера: адрес, заголовок, поисковые поля."""
+    started = time.perf_counter()
+    try:
+        outcome = _live().page_info() or {}
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_page", started, f"{type(exc).__name__}: {exc}")
+    return _live_result("live_page", started, {**outcome, "ok": bool(outcome.get("url"))},
+                        f"{outcome.get('title', '')[:50]} | {outcome.get('url', '')[:60]}")
+
+
+@server.tool(structured_output=True)
+def live_search(query: str) -> ToolResult:
+    """Напечатать запрос в поиске ТЕКУЩЕЙ страницы и подтвердить выдачу."""
+    started = time.perf_counter()
+    try:
+        outcome = _live().search(query)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_search", started, f"{type(exc).__name__}: {exc}")
+    return _live_result("live_search", started, outcome,
+                        f"выдача: {outcome.get('found', 0)} карточек")
+
+
+@server.tool(structured_output=True)
+def live_click_text(text: str) -> ToolResult:
+    """DOM-клик по элементу с заданным текстом (не координатный «слепой» клик)."""
+    started = time.perf_counter()
+    try:
+        outcome = _live().click_text(text)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_click_text", started, f"{type(exc).__name__}: {exc}")
+    return _live_result("live_click_text", started, outcome,
+                        f"клик: {outcome.get('text', '')[:60]}")
+
+
+@server.tool(structured_output=True)
+def live_video(action: str = "status") -> ToolResult:
+    """Видео на странице: status / play / pause / fullscreen / exit — с фактами."""
+    started = time.perf_counter()
+    try:
+        outcome = _live().video(action)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_video", started, f"{type(exc).__name__}: {exc}")
+    summary = (f"{action}: играет={not outcome.get('paused', True)}"
+               f", полный экран={outcome.get('fullscreen', False)}"
+               f", {outcome.get('current_time', 0)}/{outcome.get('duration')} с")
+    return _live_result("live_video", started, outcome, summary)
+
+
+@server.tool(structured_output=True)
+def live_screenshot(path: str = "") -> ToolResult:
+    """Скриншот страницы живого браузера (PNG)."""
+    started = time.perf_counter()
+    from pathlib import Path as _Path
+
+    target = path or str(_Path(__file__).resolve().parents[1] / "logs" / "live" /
+                         time.strftime("shot_%Y%m%d_%H%M%S.png"))
+    try:
+        outcome = _live().screenshot(target)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_screenshot", started, f"{type(exc).__name__}: {exc}")
+    return _live_result("live_screenshot", started, outcome,
+                        f"кадр: {outcome.get('bytes', 0)} байт")
+
+
+@server.tool(structured_output=True)
+def live_youtube(query: str, fullscreen: bool = True,
+                 screenshot_path: str = "") -> ToolResult:
+    """Живой сценарий «видео по запросу»: YouTube → поиск → первое видео →
+    воспроизведение → (по флагу) полный экран → (по флагу) скриншот.
+
+    Постусловия фактами: видео существует, `paused == false` (играет),
+    при `fullscreen=True` — `document.fullscreenElement` не пуст. Пер-шаговые
+    записи в detail показывают, где именно не сложилось.
+    """
+    started = time.perf_counter()
+    browser = _live()
+    steps: list[dict] = []
+    try:
+        if not browser.mode:
+            steps.append({"step": "start", **browser.start_work(headless=True)})
+            browser.ensure_tab()
+        elif not browser.tab:
+            steps.append({"step": "tab", **browser.ensure_tab()})
+        nav = browser.navigate("https://www.youtube.com")
+        steps.append({"step": "navigate", "url": nav.get("url"), "title": nav.get("title")})
+        time.sleep(1.5)
+        found = browser.search(query)
+        steps.append({"step": "search", "found": found.get("found"),
+                      "top": (found.get("top") or [{}])[0].get("text", "")[:80],
+                      "ok": found.get("ok")})
+        if not found.get("ok"):
+            return _fail("live_youtube", started, f"выдача пуста: {found.get('reason')}")
+        clicked = browser.click_text((found["top"][0]["text"] or "")[:40])
+        steps.append({"step": "click", "ok": clicked.get("ok"),
+                      "text": clicked.get("text", "")[:80]})
+        if not clicked.get("ok"):
+            return _fail("live_youtube", started, f"клик не прошёл: {clicked.get('reason')}")
+        appeared = browser.wait_for("!!document.querySelector('video')", 25.0)
+        steps.append({"step": "video_appeared", "ok": appeared})
+        if not appeared:
+            return _fail("live_youtube", started, "видео-элемент не появился")
+        played = browser.video("play")
+        steps.append({"step": "play", "paused": played.get("paused"),
+                      "duration": played.get("duration")})
+        if played.get("paused"):
+            return _fail("live_youtube", started, "видео не начало играть")
+        if fullscreen:
+            full = browser.video("fullscreen")
+            steps.append({"step": "fullscreen", "fullscreen": full.get("fullscreen"),
+                          "current_time": full.get("current_time")})
+        shot = None
+        if screenshot_path:
+            shot = browser.screenshot(screenshot_path)
+            steps.append({"step": "screenshot", "bytes": shot.get("bytes")})
+        status = browser.video("status")
+        ok = (not status.get("paused")) and (not fullscreen or status.get("fullscreen"))
+        outcome = {"ok": ok, "steps": steps, "title": status.get("title", "")[:100],
+                   "playing": not status.get("paused"), "fullscreen": status.get("fullscreen"),
+                   "position_s": status.get("current_time"), "duration_s": status.get("duration")}
+        if shot:
+            outcome["screenshot"] = shot.get("file")
+        result = ToolResult(ok=ok, refused=False, reason="" if ok else "постусловия не выполнены",
+                            summary=(f"видео играет: {outcome['playing']}, полный экран: "
+                                     f"{outcome['fullscreen']}, {outcome['position_s']}/"
+                                     f"{outcome['duration_s']} с"),
+                            detail=outcome)
+        _journal("live_youtube", started, result, {"query": query})
+        return result
+    finally:
+        pass  # живая сессия живёт до явного live_browser(stop); в user-режиме не закрываем
 
 
 # --- файлы (колонна B: политика «только корзина») -------------------------------
