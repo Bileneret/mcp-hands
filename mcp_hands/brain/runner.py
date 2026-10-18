@@ -30,7 +30,8 @@ from ..mcp_server import (browser_collect_sources, browser_extract_text,
                           excel_workbook_build, fs_sort_by_type, fs_trash_move, health,
                           hotkey, live_browser, live_click_text, live_navigate, live_page,
                           live_screenshot, live_search, live_video, live_youtube,
-                          notepad_run, ocr_find, ocr_window, type_text, window_activate,
+                          notepad_run, observe, ocr_find, ocr_window, type_text,
+                          window_activate,
                           windows_list, word_docx_to_pdf, word_format_document,
                           word_pdf_run, word_report_from_template)
 from ..checkpoints import CheckpointStore
@@ -52,6 +53,7 @@ DISPATCH_TABLE: dict[str, object] = {
     "content_map": content_map,
     "ocr_window": ocr_window,
     "ocr_find": ocr_find,
+    "observe": observe,
     "window_activate": window_activate,
     "click_node": click_node,
     "type_text": type_text,
@@ -257,6 +259,55 @@ def _check_expect(kind: str, params: dict) -> tuple[bool, str]:
             return False, "paths_gone без paths"
         alive = [p for p in paths if _os.path.exists(p)]
         return not alive, (f"ещё существуют: {alive[:5]}" if alive else "все пути исчезли")
+    if kind == "video_playing":
+        # «играет» — это факт из DOM: есть video и оно не на паузе
+        result = live_video("status")
+        detail = result.detail or {}
+        playing = bool(detail.get("has_video")) and detail.get("paused") is False
+        return playing, (result.summary or "нет видео")
+    if kind == "fullscreen":
+        result = live_video("status")
+        return bool((result.detail or {}).get("fullscreen")), (result.summary or "")
+    if kind == "page_matches":
+        needle = str(params.get("needle", "")).lower()
+        if not needle:
+            return False, "page_matches без needle"
+        result = live_page()
+        detail = result.detail or {}
+        haystack = " ".join(str(detail.get(key, "")) for key in ("url", "title")).lower()
+        return needle in haystack, (result.summary or f"адрес: {detail.get('url', '')}")
+    if kind == "text_on_screen":
+        needle = str(params.get("text", ""))
+        if not needle:
+            return False, "text_on_screen без text"
+        result = ocr_find(needle, hwnd=int(params.get("hwnd", 0)))
+        return bool((result.detail or {}).get("found")), (result.summary or "")
+    if kind == "window_visible":
+        # «окно на виду» = оно не свёрнуто и перекрыто не более чем частично
+        from ..geometry import window_occlusion
+
+        hwnd = int(params.get("hwnd", 0))
+        needle = str(params.get("title_substring", ""))
+        if not hwnd and needle:
+            rows = (windows_list(query=needle).detail or {}).get("windows", [])
+            hwnd = int(rows[0]["hwnd"]) if rows else 0
+        if not hwnd:
+            return False, f"окно {needle!r} не найдено"
+        facts = window_occlusion(hwnd)
+        if facts.get("minimized"):
+            return False, "окно свёрнуто"
+        return not facts.get("covered"), f"перекрытие {facts.get('share')}"
+    if kind == "foreground_is":
+        hwnd = int(params.get("hwnd", 0))
+        needle = str(params.get("title_substring", ""))
+        current = int(ctypes.windll.user32.GetForegroundWindow())
+        if hwnd:
+            return current == hwnd, f"в фокусе {current}, ждали {hwnd}"
+        if needle:
+            rows = (windows_list(query=needle).detail or {}).get("windows", [])
+            expected = {int(row["hwnd"]) for row in rows}
+            return bool(expected) and current in expected, f"в фокусе {current}, искали {needle!r}"
+        return False, "foreground_is без hwnd/title_substring"
     return False, f"runner не поддерживает kind {kind!r}"
 
 

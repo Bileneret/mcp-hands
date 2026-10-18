@@ -44,11 +44,16 @@ def test_occlusion_report_says_who_covers_and_how_much():
 
 
 def test_occlusion_of_real_window_is_reported():
-    """На живой системе функция обязана вернуть вердикт, а не упасть."""
+    """На живой системе функция обязана вернуть вердикт, а не упасть.
+
+    В безголовом окружении (фоновый раннер, CI) видимых окон нет — это отказ среды,
+    а не поломка кода, поэтому тест пропускается с причиной (замечание аудита v24).
+    """
     from mcp_hands.geometry import window_occlusion
 
     windows = (ms.windows_list().detail or {}).get("windows", [])
-    assert windows, "на стенде нет ни одного видимого окна"
+    if not windows:
+        pytest.skip("в этой сессии нет видимых окон (безголовое окружение)")
     facts = window_occlusion(int(windows[0]["hwnd"]))
     for key in ("covered", "share", "by", "minimized"):
         assert key in facts, facts

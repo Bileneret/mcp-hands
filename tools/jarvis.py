@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import ctypes
 import ctypes.wintypes
+import json
 import queue
 import sys
 import threading
@@ -195,7 +196,8 @@ def worker(assistant: Assistant, indicator: Indicator, sleep_after_s: float,
 def main() -> int:
     global QUIET
 
-    assistant = Assistant(force_work="--work" in sys.argv[1:])
+    assistant = Assistant(force_work="--work" in sys.argv[1:],
+                          goal_mode="--goal-mode" in sys.argv[1:])
 
     # Режимы приёмки без микрофона (отладка и автотесты):
     #   --say "текст"     — пропустить распознавание, сразу маршрут по тексту
@@ -203,6 +205,16 @@ def main() -> int:
     #   --quiet           — не произносить ответ вслух (проверки ночью)
     argv = sys.argv[1:]
     QUIET = "--quiet" in argv
+    if "--goal" in argv:
+        # приёмка режима цели: одна фраза-цель напрямую в планировщик и runner
+        text = argv[argv.index("--goal") + 1]
+        assistant.goal_mode = True
+        goal = assistant.run_goal(text)
+        print(f"цель: {text!r}\nджарвис: {goal['say']}")
+        print("подробности:", json.dumps({key: value for key, value in goal["detail"].items()
+                                          if key != "summary"}, ensure_ascii=False)[:400])
+        say(goal["say"])
+        return 0 if goal.get("ok") else 1
     if "--say" in argv:
         text = argv[argv.index("--say") + 1]
         result = assistant.handle(text)

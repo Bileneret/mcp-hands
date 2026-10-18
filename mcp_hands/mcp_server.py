@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import ctypes
 import json
 import logging
 import platform
@@ -40,7 +41,7 @@ LOG_PATH = Path(__file__).resolve().parents[1] / "logs" / "mcp_calls.log"
 # набора — сознательная операция: стоп-лист безопасности работает «отсутствием».
 TOOL_NAMES = frozenset({
     "windows_list", "element_find", "element_text", "content_map", "ocr_window",
-    "ocr_find", "window_activate", "click_node", "type_text", "hotkey",
+    "ocr_find", "observe", "window_activate", "click_node", "type_text", "hotkey",
     "notepad_run", "word_pdf_run", "browser_links_run", "health",
     "fs_trash_move", "fs_sort_by_type",
     "word_report_from_template", "word_format_document", "excel_workbook_build",
@@ -328,8 +329,11 @@ def _ocr_frame(hwnd: int = 0):
 
 
 @server.tool(structured_output=True)
-def ocr_window(hwnd: int, query: str = "") -> ToolResult:
+def ocr_window(hwnd: int = 0, query: str = "", title_substring: str = "") -> ToolResult:
     """OCR окна: кроп видимой части + встроенный OCR Windows; строки и слова.
+
+    Окно называется дескриптором ИЛИ заголовком (`title_substring`) — планы
+    не обязаны знать внутренние числа, а неоднозначность даёт честный отказ.
 
     В ответе — строки целиком (читаемо), первые слова и признак перекрытия:
     кадр читается с ЭКРАНА, поэтому поверх окна могло лечь чужое — об этом честно
@@ -339,6 +343,10 @@ def ocr_window(hwnd: int, query: str = "") -> ToolResult:
     from .geometry import window_occlusion
     from .screen import ScreenCaptureError
 
+    hwnd, why = resolve_window(hwnd, title_substring)
+    if not hwnd:
+        return _fail("ocr_window", started, why, True,
+                     hwnd=hwnd, title_substring=title_substring)
     try:
         image, origin = _ocr_frame(hwnd)
         words = _ocr().recognize(image, offset=origin)
@@ -367,6 +375,62 @@ def ocr_window(hwnd: int, query: str = "") -> ToolResult:
                                 "query": query.strip(), "occlusion": occlusion,
                                 "ms": round(_ocr().last_ms or 0.0, 1)})
     _journal("ocr_window", started, result, {"hwnd": hwnd, "query": query})
+    return result
+
+
+@server.tool(structured_output=True)
+def observe(max_lines: int = 25) -> ToolResult:
+    """Компактный срез обстановки: «что вокруг прямо сейчас» одним вызовом.
+
+    Активное окно (заголовок, процесс, перекрытие), строки текста в нём, сколько
+    всего окон, состояние живой сессии браузера и что из восприятия доступно.
+    Это разведка перед планом цели: вместо серии догадок модель получает факты и
+    уже по ним строит шаги. Ответ держится в бюджете ~3 КБ.
+    """
+    started = time.perf_counter()
+    from .geometry import window_occlusion
+
+    facts: dict = {}
+    try:
+        from .uia import enum_windows
+
+        user32 = ctypes.windll.user32
+        hwnd = int(user32.GetForegroundWindow())
+        windows = enum_windows()
+        row = next((item for item in windows if int(item["hwnd"]) == hwnd), {})
+        active = {"hwnd": hwnd, "title": row.get("title", ""), "exe": row.get("exe", ""),
+                  "occlusion": window_occlusion(hwnd) if hwnd else {}}
+        facts = {"active": active, "windows_total": len(windows)}
+    except Exception as exc:  # noqa: BLE001 — обстановку обязан уметь доложить каждый режим
+        return _fail("observe", started, f"{type(exc).__name__}: {exc}")
+    lines: list[dict] = []
+    if facts.get("active", {}).get("hwnd"):
+        try:
+            image, origin = _ocr_frame(int(facts["active"]["hwnd"]))
+            words = _ocr().recognize(image, offset=origin)
+            lines = _screens_word_lines(words)[:max_lines]
+        except Exception as exc:  # noqa: BLE001 — без кадра живут и остальные факты
+            facts["lines_note"] = f"текст окна не прочитан: {type(exc).__name__}"
+    facts["lines"] = lines
+    browser = _live()
+    facts["browser"] = {"mode": browser.mode, "port": browser.port,
+                        "tab_url": (browser.tab or {}).get("url", ""),
+                        "tab_title": (browser.tab or {}).get("title", "")}
+    from .ocr import available as ocr_available
+
+    facts["capabilities"] = {"ocr": bool(ocr_available()), "live": bool(browser.mode),
+                             "lines_shown": len(lines)}
+    while len(json.dumps(facts, ensure_ascii=False, default=str)) > 3000 and facts["lines"]:
+        facts["lines"] = facts["lines"][: max(1, len(facts["lines"]) // 2)]
+        facts["capabilities"]["lines_shown"] = len(facts["lines"])
+    title = facts["active"]["title"][:60]
+    summary = f"активное окно: {title or '—'}"
+    blocked = facts["active"]["occlusion"]
+    if blocked.get("covered"):
+        who = (blocked.get("by") or [{}])[0].get("title", "")
+        summary += f" (перекрыто: {who[:40]})"
+    result = ToolResult(ok=True, refused=False, summary=summary, detail=facts)
+    _journal("observe", started, result, {})
     return result
 
 
@@ -434,10 +498,46 @@ def ocr_find(text: str, hwnd: int = 0, exact: bool = False,
 # --- действия ---------------------------------------------------------------------
 
 
+def resolve_window(hwnd: int = 0, title_substring: str = "") -> tuple[int, str]:
+    """Находит окно по дескриптору ИЛИ по подстроке в заголовке (внутренний помощник).
+
+    Планировщик не знает числовых дескрипторов, и это нормально: в живом прогоне
+    19.10 модель пыталась активировать окно, не имея hwnd, и получала отказ.
+    Теперь окно можно назвать по заголовку — как это и делает человек. Возвращает
+    (hwnd, причина): hwnd=0 означает «не найдено или неоднозначно», и причина
+    объясняет, что именно случилось.
+    """
+    if hwnd:
+        return int(hwnd), ""
+    needle = title_substring.strip()
+    if not needle:
+        return 0, "нужен hwnd или title_substring"
+    from .uia import enum_windows
+
+    rows = filter_windows(enum_windows(), needle)
+    if not rows:
+        return 0, f"окно с заголовком {needle!r} не найдено"
+    exact = [row for row in rows if needle.lower() in str(row.get("title", "")).lower()]
+    if len(exact) > 1:
+        titles = [f"{row['title'][:40]!r} (hwnd {row['hwnd']})" for row in exact[:4]]
+        return 0, (f"под {needle!r} подходит {len(exact)} окон: {titles} — "
+                   "уточни формулировку или передай hwnd")
+    return int(exact[0]["hwnd"]), ""
+
+
 @server.tool(structured_output=True)
-def window_activate(hwnd: int) -> ToolResult:
-    """Активация окна (<1.5 с) — SetForegroundWindow + страховка AttachThreadInput."""
+def window_activate(hwnd: int = 0, title_substring: str = "") -> ToolResult:
+    """Активация окна (<1.5 с) — SetForegroundWindow + страховка AttachThreadInput.
+
+    Окно можно назвать заголовком (`title_substring`) вместо дескриптора: так
+    строятся планы, не знающие внутренних чисел. Неоднозначность — честный отказ
+    со списком кандидатов, а не активация «первого попавшегося».
+    """
     started = time.perf_counter()
+    hwnd, why = resolve_window(hwnd, title_substring)
+    if not hwnd:
+        return _fail("window_activate", started, why, True,
+                     hwnd=hwnd, title_substring=title_substring)
     try:
         outcome = _act().activate(hwnd)
     except Exception as exc:  # noqa: BLE001

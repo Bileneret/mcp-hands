@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ..mcp_server import TOOL_NAMES
-from .plan import Plan, parse_plan
+from .plan import EXPECT_KINDS, Plan, parse_plan
 
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "config.local.json"
 
@@ -114,15 +114,26 @@ SYSTEM_PROMPT_TEMPLATE = """Ты — планировщик компьютерн
 Доступные действия (строго этот список):
 {actions}
 
+Доступные виды постусловий (expect):
+{expect_kinds}
+
 Формат ответа: СТРОГО один JSON-объект без markdown, вида:
 {{"task_id": "<id задачи>", "steps": [
   {{"action": "<имя из списка>", "args": {{...}},
-    "expect": {{"kind": "<element_exists|text_contains|file_contains|window_open|process_gone|scenario_passed>", "params": {{...}}}}}}]}}
+    "expect": {{"kind": "<вид постусловия>", "params": {{...}}}}}}]}}
 
 Правила:
 - максимум 64 шага; каждый шаг обязан иметь expect (замкнутый цикл);
 - домены "notepad_run", "word_pdf_run", "browser_links_run" закрывают свои
   задачи целиком и проверяются "scenario_passed" — не раскладывай их на мелочи;
+- для живой Opera (плитки, страницы, видео) используй live_* вместе с
+  "page_matches"/"video_playing"/"fullscreen"; если браузер без отладочного порта,
+  работай глазами и руками: ocr_find по тексту, window_activate с expect
+  "foreground_is", затем клик по найденному элементу;
+- числовые hwnd ты не знаешь и знать не должен: бери активное окно из разведки
+  (observe возвращает active.hwnd), ищи окно через windows_list(query=...), либо
+  называй окно заголовком — window_activate и ocr_window принимают
+  title_substring;
 - если своей задачей чувства не хватает (нет нужного инструмента), верни
   план с единственным шагом "health" и expect {{"kind": "process_gone",
   "params": {{"note": "missing_tools: <перечисление>"}}}} — так честно фиксируется запрет;
@@ -134,9 +145,36 @@ USER_PROMPT_TEMPLATE = """Задача {task_id}: {title}.
 Построй план. Ответ — только JSON-объект."""
 
 
+#: Подсказка планировщику по видам постусловий: что именно проверяется в мире.
+_EXPECT_HINTS = {
+    "element_exists": "UIA-элемент найден в окне (params: hwnd, name/control_type)",
+    "text_contains": "текст окна содержит подстроку (params: hwnd, needle)",
+    "file_contains": "файл содержит подстроку (params: path, needle)",
+    "file_exists": "файл есть и не меньше min_bytes (params: path, min_bytes)",
+    "window_open": "есть окно с подстрокой в заголовке (params: title_substring)",
+    "process_gone": "процесса нет (params: pid)",
+    "scenario_passed": "доменный сценарий сам проверил себя",
+    "no_files_in": "в папке не осталось файлов (params: dir)",
+    "paths_gone": "перечисленных путей нет (params: paths)",
+    "video_playing": "на странице живой Opera видео играет (без params)",
+    "fullscreen": "видео в полноэкранном режиме (без params)",
+    "page_matches": "адрес или заголовок страницы содержит подстроку (params: needle)",
+    "text_on_screen": "текст найден на экране распознаванием (params: text, hwnd=0)",
+    "window_visible": "окно не свёрнуто и не перекрыто (params: hwnd или title_substring)",
+    "foreground_is": "в фокусе именно это окно (params: hwnd или title_substring)",
+}
+
+
+def expect_kinds_help() -> str:
+    """Список постусловий для промпта планировщика (единый источник — plan.py)."""
+    return "\n".join(f"- {kind}: {_EXPECT_HINTS.get(kind, '')}"
+                     for kind in sorted(EXPECT_KINDS))
+
+
 def build_plan_messages(task_id: str, title: str, needs: list[str], note: str = "") -> list[dict]:
     """Собирает [system, user] для запроса плана; действия — из канона сервера."""
-    system = SYSTEM_PROMPT_TEMPLATE.format(actions=", ".join(sorted(TOOL_NAMES)))
+    system = SYSTEM_PROMPT_TEMPLATE.format(actions=", ".join(sorted(TOOL_NAMES)),
+                                           expect_kinds=expect_kinds_help())
     user = USER_PROMPT_TEMPLATE.format(task_id=task_id, title=title,
                                        needs=", ".join(needs) or "—", note=note or "—")
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]

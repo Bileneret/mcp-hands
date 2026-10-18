@@ -20,7 +20,12 @@ from ..mcp_server import TOOL_NAMES
 EXPECT_KINDS = {
     "element_exists", "text_contains", "file_contains", "file_exists",
     "window_open", "process_gone", "scenario_passed",
-    "no_files_in", "paths_gone"}
+    "no_files_in", "paths_gone",
+    # браузер и зрение (Шаг 1): цели про видео, страницы и видимость окна
+    # проверяются против реального мира, а не по ответу модели
+    "video_playing", "fullscreen", "page_matches", "text_on_screen",
+    "window_visible", "foreground_is",
+}
 
 
 class Expect(BaseModel):

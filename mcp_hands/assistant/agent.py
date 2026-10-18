@@ -169,7 +169,8 @@ class Assistant:
     """Один сеанс Джарвиса: держит живой браузер и конфиг мозга."""
 
     def __init__(self, config: LLMConfig | None = None, log_dir: Path | None = None,
-                 force_work: bool = False, keep_history: int = 8) -> None:
+                 force_work: bool = False, keep_history: int = 8,
+                 goal_mode: bool = False) -> None:
         from .dialogue import Dialogue
 
         _build_registry()
@@ -178,7 +179,9 @@ class Assistant:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.force_work = force_work  # приёмка: не трогать живую Opera владельца
         self.keep_history = keep_history
+        self.goal_mode = goal_mode  # сложные фразы решаются планом цели, а не tool-loop
         self.last_url = ""  # страница, на которой владелец нас оставил
+        self._goal_runner = None  # создаётся по требованию (и только в режиме цели)
         self.dialogue = Dialogue(self.log_dir / "jarvis_memory.db")
         self.trace: list[dict] = []
 
@@ -374,9 +377,42 @@ class Assistant:
         return (final.text or "").strip() or "Не удалось завершить за отведённые шаги."
 
     def handle(self, text: str) -> dict:
-        """Полный маршрут: локальный интент → старший мозг. Возвращает {"say", "kind"}."""
+        """Полный маршрут: локальный интент → цель → старший мозг.
+
+        Локальный интент отвечает мгновенно; в режиме цели сложная фраза уходит
+        в цикл «разведка → план → исполнение с постусловиями → отчёт»; иначе
+        работает прежний tool-loop ассистента.
+        """
         local = self.run_local(text)
         if local.get("handled"):
             return {"say": local["say"], "kind": "local", "detail": local.get("detail", {})}
+        if self.goal_mode:
+            goal = self.run_goal(text)
+            if goal.get("ok") or goal.get("detail", {}).get("planned", True):
+                return {"say": goal["say"], "kind": "goal", "detail": goal.get("detail", {})}
         smart = self.run_smart(text)
         return {"say": smart["say"], "kind": "smart", "detail": smart.get("detail", {})}
+
+    def run_goal(self, text: str) -> dict:
+        """Цель целиком: разведка, план, исполнение с проверками, отчёт голосом."""
+        from .goal import GoalRunner
+
+        runner = self._goal_runner
+        if runner is None:
+            memory = None
+            try:  # журнал целей в общей памяти ядра (метрики миссий)
+                from ..memory import Memory
+
+                memory = Memory(self.log_dir / "brain_memory.db")
+            except Exception as exc:  # noqa: BLE001 — без журнала цель всё равно нужна
+                self._log("goal_memory_unavailable", error=str(exc)[:160])
+            runner = GoalRunner(self.config, self.log_dir, memory=memory)
+            self._goal_runner = runner
+        outcome = runner.run(text)
+        self.dialogue.remember("user", text)
+        self.dialogue.remember("assistant", outcome["say"], kind="goal")
+        self._log("goal", text=text, ok=outcome.get("ok"),
+                  say=outcome["say"][:160],
+                  detail={key: value for key, value in (outcome.get("detail") or {}).items()
+                          if key in ("source", "attempts", "steps", "seconds")})
+        return outcome
