@@ -54,6 +54,7 @@ OFFICE_TIMEOUTS = {
     "word_open": 45.0,
     "word_replace": 45.0,
     "word_save_as": 60.0,
+    "word_format": 60.0,
 }
 DEFAULT_OFFICE_TIMEOUT_S = 45.0
 
@@ -157,6 +158,11 @@ class WordSession:
     def replace(self, mapping: dict, match_case: bool = False) -> OfficeOutcome:
         """Заменяет плейсхолдеры во всём документе."""
         return self._call("word_replace", mapping=dict(mapping), match_case=match_case)
+
+    def format_document(self, actions: list) -> OfficeOutcome:
+        """Форматирование: стили/шрифты/интервалы/оглавление; каждое подтверждается
+        перечитыванием свойства в сателлите."""
+        return self._call("word_format", actions=list(actions))
 
     def save_as(self, path: str, as_pdf: bool = False) -> OfficeOutcome:
         return self._call("word_save_as", path=_absolute(path), as_pdf=as_pdf)

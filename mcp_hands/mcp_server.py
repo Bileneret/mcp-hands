@@ -42,7 +42,8 @@ TOOL_NAMES = frozenset({
     "windows_list", "element_find", "element_text", "content_map", "ocr_window",
     "window_activate", "click_node", "type_text", "hotkey",
     "notepad_run", "word_pdf_run", "browser_links_run", "health",
-    "fs_trash_move", "fs_sort_by_type"})
+    "fs_trash_move", "fs_sort_by_type",
+    "word_report_from_template", "word_format_document"})
 
 server = MCPServer(
     name="mcp-hands",
@@ -510,6 +511,132 @@ def word_pdf_run() -> ToolResult:
 def browser_links_run() -> ToolResult:
     """Сценарий браузера целиком: headless Edge + CDP → собрать ссылки → проверить файл."""
     return _run_domain("browser_links_run", "browser_links")
+
+
+# --- офисные инструменты (колонна A: Word-COM композиции) -------------------------
+
+
+@server.tool(structured_output=True)
+def word_report_from_template(template: str, replacements: dict,
+                              save_as: str) -> ToolResult:
+    """Собрать документ по ШАБЛОНУ: открыть шаблон → заменить плейсхолдеры → сохранить как.
+
+    Титульный лист и структура живут в самом шаблоне (литералами), инструмент
+    подменяет реквизиты и подтверждает: файл создан, размер не нулевой,
+    плейсхолдеров в документе не осталось (проверка — состоянием документа,
+    не кодом возврата). Word поднимается и закрывается внутри вызова.
+    """
+    started = time.perf_counter()
+    from pathlib import Path as _Path
+
+    if not _Path(template).is_file():
+        return _fail("word_report_from_template", started,
+                     f"шаблон не найден: {template}", True)
+    if not replacements:
+        return _fail("word_report_from_template", started, "нет замен", True)
+    from .office import WordSession
+    from .probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeProcess
+
+    word = None
+    try:
+        with ProbeProcess(default_timeout_s=DOMAIN_OPERATION_TIMEOUT_S) as satellite:
+            word = WordSession(satellite)
+            start = word.start()
+            if not start.ok:
+                return _fail("word_report_from_template", started,
+                             f"Word не поднялся: {start.reason}")
+            opened = word.open(template)
+            if not opened.ok:
+                return _fail("word_report_from_template", started,
+                             f"шаблон не открылся: {opened.reason}")
+            replaced = word.replace(replacements)
+            if not (replaced.ok and replaced.value.get("replaced_all")):
+                return _fail("word_report_from_template", started,
+                             f"замены не полны: остались {replaced.value.get('remaining')}")
+            saved = word.save_as(save_as)
+            target = _Path(save_as)
+            exists = target.exists()
+            size = target.stat().st_size if exists else 0
+            outcome_ok = saved.ok and exists and size > 0
+            detail = {"template": template, "saved": str(target), "bytes": size,
+                      "replace": replaced.value, "save_outcome": saved.describe()}
+    except Exception as exc:  # noqa: BLE001
+        return _fail("word_report_from_template", started, f"{type(exc).__name__}: {exc}")
+    finally:
+        # свой экземпляр Word закрывается всегда: у пользователя может быть свой
+        if word is not None and word.pid:
+            try:
+                word.quit()
+            except Exception:  # noqa: BLE001
+                pass
+    result = ToolResult(ok=outcome_ok,
+                        reason="" if outcome_ok else "документ не сохранён",
+                        summary=f"отчёт собран: {save_as} ({detail['bytes']} байт)",
+                        detail=detail)
+    _journal("word_report_from_template", started, result, {"template": template})
+    return result
+
+
+@server.tool(structured_output=True)
+def word_format_document(path: str, actions: list, save_as: str = "") -> ToolResult:
+    """Форматирование документа Word: стили, шрифты, интервалы, оглавление.
+
+    `actions` — список под-операций: `{"op": "set_style", "find": "Введение",
+    "style": "Heading 1"}`, `{"op": "set_font", "find": ..., "name": "Times New Roman",
+    "size": 14}`, `{"op": "set_spacing", "line_spacing": 1.5, "space_after": 6}`,
+    `{"op": "insert_toc", "find": "ОГЛАВЛЕНИЕ"}`. Каждая под-операция подтверждается
+    перечитыванием свойства документа (стиль/шрифт/интервалы/число оглавлений).
+    `save_as` пустой — сохранить в исходный файл (перезапись THIS документа).
+    """
+    started = time.perf_counter()
+    from pathlib import Path as _Path
+
+    if not _Path(path).is_file():
+        return _fail("word_format_document", started, f"документ не найден: {path}", True)
+    if not actions:
+        return _fail("word_format_document", started, "пустой список операций", True)
+    from .office import WordSession
+    from .probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeProcess
+
+    word = None
+    try:
+        with ProbeProcess(default_timeout_s=DOMAIN_OPERATION_TIMEOUT_S) as satellite:
+            word = WordSession(satellite)
+            start = word.start()
+            if not start.ok:
+                return _fail("word_format_document", started,
+                             f"Word не поднялся: {start.reason}")
+            opened = word.open(path)
+            if not opened.ok:
+                return _fail("word_format_document", started,
+                             f"документ не открылся: {opened.reason}")
+            formatted = word.format_document(actions)
+            if not (formatted.ok and (formatted.value or {}).get("all_ok")):
+                bad = [item for item in (formatted.value or {}).get("applied", [])
+                       if not item.get("ok")]
+                reason = formatted.reason or f"под-операции отклонились: {bad[:3]}"
+                return _fail("word_format_document", started, reason)
+            target = save_as or path
+            saved = word.save_as(target)
+            size = _Path(target).stat().st_size if _Path(target).exists() else 0
+            outcome_ok = saved.ok and size > 0
+            detail = {"file": str(target), "bytes": size,
+                      "format": formatted.value, "save_outcome": saved.describe()}
+    except Exception as exc:  # noqa: BLE001
+        return _fail("word_format_document", started, f"{type(exc).__name__}: {exc}")
+    finally:
+        if word is not None and word.pid:
+            try:
+                word.quit()
+            except Exception:  # noqa: BLE001
+                pass
+    result = ToolResult(ok=outcome_ok,
+                        reason="" if outcome_ok else "документ не сохранён",
+                        summary=(f"отформатировано; оглавлений: "
+                                 f"{detail['format'].get('toc_count')} ({detail['bytes']} байт)"),
+                        detail=detail)
+    _journal("word_format_document", started, result, {"path": path})
+    return result
 
 
 # --- файлы (колонна B: политика «только корзина») -------------------------------

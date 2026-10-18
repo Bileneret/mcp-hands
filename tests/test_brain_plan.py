@@ -25,7 +25,7 @@ def test_benchmark_registry_is_honest():
     ids = {task.id for task in TASKS}
     assert len(ids) == 10 and all(tid.startswith("b") for tid in ids)
     covered = {t.id for t in TASKS if set(t.needs) <= TOOL_NAMES}
-    assert covered == {"b03", "b08"}, (
+    assert covered == {"b01", "b02", "b03", "b08"}, (
         "набор инструментов изменился — обнови ожидание этого стража и реестр "
         f"в suite (scripted-планы/стенды); сейчас покрыты: {sorted(covered)}")
     for row in report["tasks"]:

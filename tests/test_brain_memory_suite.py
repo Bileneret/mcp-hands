@@ -53,11 +53,11 @@ def test_runner_writes_steps_and_incidents_to_memory(memory, tmp_path):
 
 def test_suite_dry_llm_records_all_selected_tasks(tmp_path):
     """Сьюта на непокрытых задачах: честный missing_tools по именам, без имитации."""
-    summary = run_suite(task_ids=["b01", "b09"], db_path=tmp_path / "m.db")
+    summary = run_suite(task_ids=["b07", "b09"], db_path=tmp_path / "m.db")
     assert summary["mode"].startswith("scripted")
     by_id = {row["task_id"]: row for row in summary["tasks"]}
-    assert by_id["b01"]["status"] == "missing_tools"
-    assert "word_report_from_template" in by_id["b01"]["reason"]
+    assert by_id["b07"]["status"] == "missing_tools"
+    assert "browser_youtube_capture" in by_id["b07"]["reason"]
     assert "excel_workbook_build" in by_id["b09"]["reason"]
     assert summary["passed"] == 0 and summary["missing_tools"] == 2
 
@@ -86,3 +86,16 @@ def test_suite_b03_scripted_passes(tmp_path):
     statuses = {(r["task_id"], r["status"]): r["runs"]
                 for r in summary["metrics"]["by_task_status"]}
     assert statuses[("b03", "passed")] == 1, statuses
+
+
+@pytest.mark.office
+def test_suite_b01_b02_stands_pass(tmp_path):
+    """Офисная колонна A на стендах: b01 — отчёт по шаблону (титул+структура),
+    b02 — форматирование (заголовки-стили, шрифт, интервалы, оглавление).
+    Оба инструмента проверяют себя перечитыванием свойств документа
+    (OutlineLevel/InUse), поэтому вердикт passed — не «вызов не упал»."""
+    summary = run_suite(task_ids=["b01", "b02"], db_path=tmp_path / "m.db")
+    by_id = {row["task_id"]: row for row in summary["tasks"]}
+    assert by_id["b01"]["status"] == "passed", by_id["b01"]
+    assert by_id["b02"]["status"] == "passed", by_id["b02"]
+    assert summary["failed"] == 0, summary

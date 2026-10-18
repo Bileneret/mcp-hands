@@ -18,7 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from ..mcp_server import TOOL_NAMES
 
 EXPECT_KINDS = {
-    "element_exists", "text_contains", "file_contains",
+    "element_exists", "text_contains", "file_contains", "file_exists",
     "window_open", "process_gone", "scenario_passed",
     "no_files_in", "paths_gone"}
 

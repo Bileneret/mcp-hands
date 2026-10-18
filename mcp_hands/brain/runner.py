@@ -27,7 +27,8 @@ from ..mcp_server import TOOL_NAMES, ToolResult
 from ..mcp_server import (browser_links_run, click_node, content_map, element_find,
                           element_text, fs_sort_by_type, fs_trash_move, health, hotkey,
                           notepad_run, ocr_window, type_text, window_activate,
-                          windows_list, word_pdf_run)
+                          windows_list, word_format_document, word_pdf_run,
+                          word_report_from_template)
 from .plan import Plan
 
 # Статическая таблица диспетчеризации: имя инструмента → функция ядра.
@@ -48,6 +49,8 @@ DISPATCH_TABLE: dict[str, object] = {
     "health": health,
     "fs_trash_move": fs_trash_move,
     "fs_sort_by_type": fs_sort_by_type,
+    "word_report_from_template": word_report_from_template,
+    "word_format_document": word_format_document,
 }
 
 assert set(DISPATCH_TABLE) == set(TOOL_NAMES), (
@@ -171,6 +174,18 @@ def _check_expect(kind: str, params: dict) -> tuple[bool, str]:
             ctypes.windll.kernel32.CloseHandle(handle)
             return False, f"процесс {pid} ещё существует"
         return True, f"процесса {pid} нет"
+    if kind == "file_exists":
+        path = params.get("path", "")
+        if not path:
+            return False, "file_exists без path"
+        from pathlib import Path as _Path
+
+        target = _Path(path)
+        min_bytes = int(params.get("min_bytes", 1))
+        if not target.exists():
+            return False, f"файла {path!r} нет"
+        size = target.stat().st_size
+        return size >= min_bytes, f"файл {size} байт (минимум {min_bytes})"
     if kind == "no_files_in":
         directory = params.get("dir", "")
         if not directory:

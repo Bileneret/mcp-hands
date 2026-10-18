@@ -33,6 +33,59 @@ SCRIPTED_PLANS: dict[str, dict] = {
 }
 
 
+def _prepare_word_template(path: Path) -> None:
+    """Готовит .docx-шаблон отчёта с плейсхолдерами (титул — литералами).
+
+    Шаблон делается настоящим Word-ом через тот же COM-исполнитель: фикстурные
+    бинарники в репозиторий не тащим, а живой документ честнее заготовки.
+    """
+    from ..office import WordSession
+    from ..probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeProcess
+
+    title = ("МИНИСТЕРСТВО ОБРАЗОВАНИЯ\n"
+             "ОТЧЁТ О ЛАБОРАТОРНОЙ РАБОТЕ\n\n")
+    body = ("Тема: {{ТЕМА}}\n"
+            "Автор: {{АВТОР}}\n"
+            "Группа: {{ГРУППА}}\n"
+            "Дата: {{ДАТА}}\n\n"
+            "Введение\nЦель работы.\n\n"
+            "Методика\nОписание.\n\n"
+            "Результаты\nТаблица и вывод.\n")
+    with ProbeProcess(default_timeout_s=DOMAIN_OPERATION_TIMEOUT_S) as satellite:
+        word = WordSession(satellite)
+        try:
+            if not word.start().ok:
+                raise RuntimeError("Word не поднялся для подготовки шаблона")
+            created = word.new_document(title + body)
+            if not created.ok:
+                raise RuntimeError(f"шаблон не создан: {created.reason}")
+            saved = word.save_as(str(path))
+            if not (saved.ok and path.exists()):
+                raise RuntimeError(f"шаблон не сохранён: {saved.reason}")
+        finally:
+            if word.pid:
+                word.quit()
+
+
+def _stand_report_from_template(workdir: Path) -> dict:
+    """Стенд задачи b01: шаблон отчёта → замена реквизитов → готовый .docx."""
+    template = workdir / "шаблон_отчёта.docx"
+    report = workdir / "отчёт_лабы.docx"
+    _prepare_word_template(template)
+    plan = {"task_id": "b01", "steps": [
+        {"action": "word_report_from_template",
+         "args": {"template": str(template),
+                  "replacements": {
+                      "{{ТЕМА}}": "Разбор лабораторной работы",
+                      "{{АВТОР}}": "MCP-Hands",
+                      "{{ГРУППА}}": "ИУ-42",
+                      "{{ДАТА}}": "18.10.2026"},
+                  "save_as": str(report)},
+         "expect": {"kind": "file_exists",
+                    "params": {"path": str(report), "min_bytes": 2000}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
 def _stand_downloads(workdir: Path) -> dict:
     """Стенд задачи b08: папка-загрузки с известным набором файлов + план разбора.
 
@@ -58,7 +111,55 @@ def _stand_downloads(workdir: Path) -> dict:
     return {"plan": plan, "stand": str(workdir)}
 
 
-STANDS: dict[str, object] = {"b08": _stand_downloads}
+def _prepare_word_draft(path: Path) -> None:
+    """Черновик без оформления: заголовки — простым текстом (стили ставит план)."""
+    body = ("ОГЛАВЛЕНИЕ\n\n"
+            "Введение\nЦель работы и постановка задачи.\n\n"
+            "Методика\nПоследовательность измерений и обработка.\n\n"
+            "Результаты\nСводная таблица и выводы по работе.\n")
+    from ..office import WordSession
+    from ..probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeProcess
+
+    with ProbeProcess(default_timeout_s=DOMAIN_OPERATION_TIMEOUT_S) as satellite:
+        word = WordSession(satellite)
+        try:
+            if not word.start().ok:
+                raise RuntimeError("Word не поднялся для черновика")
+            if not word.new_document(body).ok:
+                raise RuntimeError("черновик не создан")
+            saved = word.save_as(str(path))
+            if not (saved.ok and path.exists()):
+                raise RuntimeError("черновик не сохранён")
+        finally:
+            if word.pid:
+                word.quit()
+
+
+def _stand_format_document(workdir: Path) -> dict:
+    """Стенд задачи b02: черновик → стили/шрифт/интервалы/оглавление → готовый .docx."""
+    draft = workdir / "черновик.docx"
+    styled = workdir / "оформленный.docx"
+    _prepare_word_draft(draft)
+    plan = {"task_id": "b02", "steps": [
+        {"action": "word_format_document",
+         "args": {"path": str(draft),
+                  "save_as": str(styled),
+                  "actions": [
+                      {"op": "set_style", "find": "Введение", "style": "Heading 1"},
+                      {"op": "set_style", "find": "Методика", "style": "Heading 1"},
+                      {"op": "set_style", "find": "Результаты", "style": "Heading 1"},
+                      {"op": "set_font", "find": "Введение", "name": "Times New Roman",
+                       "size": 14},
+                      {"op": "set_spacing", "line_spacing": 1.5, "space_after": 6},
+                      {"op": "insert_toc", "find": "ОГЛАВЛЕНИЕ"}]},
+         "expect": {"kind": "file_exists",
+                    "params": {"path": str(styled), "min_bytes": 2000}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
+STANDS: dict[str, object] = {"b08": _stand_downloads,
+                             "b01": _stand_report_from_template,
+                             "b02": _stand_format_document}
 
 
 def _record_missing(task, memory: Memory) -> dict:

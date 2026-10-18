@@ -234,6 +234,107 @@ class Worker:
         return {"remaining": remaining, "replaced_all": not remaining,
                 "characters": int(document.Content.Characters.Count)}
 
+    def op_word_format(self, actions: list) -> dict:
+        """Форматирование документа: стили, шрифты, интервалы, оглавление.
+
+        Каждая под-операция подтверждается ПЕРЕЧТЕНИЕМ свойства (а не кодом
+        возврата): стиль найденного абзаца, имя/размер шрифта, правила интервалов,
+        число таблиц оглавления. Ошибка одной под-операции не убивает остальные —
+        она фиксируется в её записи (локализованный Word отказывает на чужих
+        именах стилей: применяем builtin-коды, не зависящие от языка).
+        """
+        # wdBuiltinStyle: имена не зависят от локали Word.
+        builtin_styles = {"Normal": -1, "Heading 1": -2, "Heading 2": -3, "Heading 3": -4,
+                          "Heading 4": -5, "Heading 5": -6, "Heading 6": -7,
+                          "Heading 7": -8, "Heading 8": -9, "Heading 9": -10,
+                          "Title": -63, "Subtitle": -75, "Caption": -35}
+        document = self.word.ActiveDocument
+        applied: list[dict] = []
+
+        def _find_range(text: str):
+            find = document.Content.Find
+            find.ClearFormatting()
+            found = find.Execute(text, False, False, False, False, False, True, 1, False)
+            return find.Parent if found else None
+
+        for action in actions:
+            op = str(action.get("op", ""))
+            find_text = str(action.get("find", ""))
+            record: dict = {"op": op, "find": find_text, "ok": False}
+            try:
+                if find_text:
+                    rng = _find_range(find_text)
+                    if rng is None:
+                        record["reason"] = f"текст {find_text!r} не найден"
+                        applied.append(record)
+                        continue
+                else:
+                    rng = document.Content
+                if op == "set_style":
+                    name = str(action.get("style", "Normal"))
+                    style_code = builtin_styles.get(name)
+                    if style_code is not None:
+                        # Стиль применяем к АБЗАЦАМ диапазона: назначение Range.Style
+                        # в невидимом COM-документе не превращало абзац в заголовок
+                        # (OutlineLevel оставался 10 — проверено диагностикой).
+                        rng.Paragraphs.Style = style_code
+                        outline = int(rng.Paragraphs(1).Range.ParagraphFormat.OutlineLevel)
+                        is_heading = name.startswith("Heading")
+                        heading_ok = (1 <= outline <= 9) if is_heading else (outline == 10)
+                        record.update({"style": str(document.Styles(style_code).NameLocal),
+                                       "outline_level": outline,
+                                       "in_use": bool(document.Styles(style_code).InUse),
+                                       "ok": bool(document.Styles(style_code).InUse) and heading_ok})
+                        if not record["ok"] and is_heading:
+                            record["reason"] = f"абзац не стал заголовком (уровень {outline})"
+                    else:
+                        rng.Paragraphs.Style = name  # локальное имя — на ответственности плана
+                        record.update({"style": name, "ok": True})
+                elif op == "set_font":
+                    if action.get("name"):
+                        rng.Font.Name = str(action["name"])
+                    if action.get("size"):
+                        rng.Font.Size = float(action["size"])
+                    record.update({"font": str(rng.Font.Name), "size": float(rng.Font.Size),
+                                   "ok": True})
+                elif op == "set_spacing":
+                    spacing = float(action.get("line_spacing", 1.0))
+                    rule = {1.0: 0, 1.5: 1, 2.0: 2}.get(spacing, 5)  # 5 = wdLineSpaceMultiple
+                    target = rng.ParagraphFormat
+                    target.LineSpacingRule = rule
+                    if rule == 5:
+                        target.LineSpacing = 12.0 * spacing
+                    if action.get("space_after") is not None:
+                        target.SpaceAfter = float(action["space_after"])
+                    record.update({"rule": int(target.LineSpacingRule),
+                                   "after": float(target.SpaceAfter), "ok": True})
+                elif op == "insert_toc":
+                    anchor = rng
+                    if find_text:
+                        anchor.Collapse(0)  # wdCollapseEnd — оглавление ПОСЛЕ абзаца
+                    # Add(Range, UseHeadingStyles, Upper, Lower, UseFields, TableID,
+                    #     RightAlignPageNumbers, IncludePageNumbers)
+                    toc = document.TablesOfContents.Add(anchor, True, 1, 3, False, "",
+                                                        True, True)
+                    toc.Update()
+                    # ЛОВУШКА (проверено диагностикой): document.Repaginate() на
+                    # невидимом COM-документе подвисает навсегда. Текст поля может
+                    # остаться «Элементы оглавления не найдены», пока Word не
+                    # переразобьёт страницы сам; честное подтверждение — сам факт
+                    # существования таблицы оглавления (Count), а наполнение
+                    # проверяет этап рендеринга/печати.
+                    record.update({"toc_count": int(document.TablesOfContents.Count),
+                                   "toc_text": str(toc.Range.Text)[:120], "ok": True})
+                else:
+                    record["reason"] = f"неизвестная под-операция {op!r}"
+            except Exception as exc:  # noqa: BLE001 — фиксируем и идём дальше
+                record["reason"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+            applied.append(record)
+
+        toc_count = int(document.TablesOfContents.Count)
+        return {"applied": applied, "all_ok": all(item.get("ok") for item in applied),
+                "toc_count": toc_count, "paragraphs": int(document.Paragraphs.Count)}
+
     def op_word_close_document(self, save: bool = False) -> dict:
         """Закрывает активный документ, оставляя Word запущенным."""
         document = self.word.ActiveDocument
