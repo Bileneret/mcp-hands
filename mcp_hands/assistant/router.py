@@ -27,6 +27,19 @@ INTENT_RULES: list[tuple[str, str]] = [
     (r"(следующ(ее|ий) видео|переключи видео)", "video_next"),
 ]
 
+#: «Видишь ли X на экране?» — вопрос к глазам, а не к памяти и не к странице.
+#: Ключ — как называет владелец, значение — что искать в распознанном тексте
+#: (OCR видит подпись плитки «YouTube», а не русское «ютуб»).
+VISION_VERBS = r"(видишь|видно|видите|увидишь|на экране|посмотри|глянь|погляди|есть ли)"
+SCREEN_WORDS = {
+    "ютуб": "youtube", "youtube": "youtube",
+    "твич": "twitch", "twitch": "twitch",
+    "дискорд": "discord", "discord": "discord",
+    "опера": "opera", "оперу": "opera", "браузер": "opera",
+    "блокнот": "блокнот", "гугл": "google", "google": "google",
+    "телеграм": "telegram", "telegram": "telegram",
+}
+
 
 def _site_in(text: str) -> str | None:
     """Какой сайт назван в фразе. Названия матчатся как слова с падежным хвостом
@@ -85,6 +98,15 @@ def route(text: str) -> dict | None:
                 # у YouTube «следующее» — Shift+N (доверенная клавиша через CDP)
                 args = {"key": "N", "code": "KeyN", "shift": True}
             return {"action": action, "args": args, "say": says.get(action, "")}
+
+    # «Видишь ли на экране YouTube?» — прямой вопрос к глазам: ищем текст в кадре,
+    # а не в DOM и не в памяти. Срабатывает только когда назван знакомый объект:
+    # иначе «посмотри, что тут» уходит старшему мозгу как сложная фраза.
+    if re.search(VISION_VERBS, lowered):
+        for word, needle in SCREEN_WORDS.items():
+            if re.search(r"\b" + re.escape(word) + r"[а-яё]{0,2}\b", lowered):
+                return {"action": "screen_look", "args": {"text": needle, "label": word},
+                        "say": f"Смотрю на экран: видно ли {word}."}
 
     # «открой/запусти оперу» — живой браузер (сначала живой экземпляр владельца)
     if (re.search(r"\b(опер\w*|браузер\w*|browser)\b", lowered)

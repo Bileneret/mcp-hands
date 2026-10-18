@@ -30,7 +30,7 @@ from ..mcp_server import (browser_collect_sources, browser_extract_text,
                           excel_workbook_build, fs_sort_by_type, fs_trash_move, health,
                           hotkey, live_browser, live_click_text, live_navigate, live_page,
                           live_screenshot, live_search, live_video, live_youtube,
-                          notepad_run, ocr_window, type_text, window_activate,
+                          notepad_run, ocr_find, ocr_window, type_text, window_activate,
                           windows_list, word_docx_to_pdf, word_format_document,
                           word_pdf_run, word_report_from_template)
 from ..checkpoints import CheckpointStore
@@ -51,6 +51,7 @@ DISPATCH_TABLE: dict[str, object] = {
     "element_text": element_text,
     "content_map": content_map,
     "ocr_window": ocr_window,
+    "ocr_find": ocr_find,
     "window_activate": window_activate,
     "click_node": click_node,
     "type_text": type_text,

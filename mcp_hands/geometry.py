@@ -78,6 +78,100 @@ def rect_center(rect: dict) -> tuple[int, int]:
     return (rect["left"] + rect["right"]) // 2, (rect["top"] + rect["bottom"]) // 2
 
 
+def intersection_area(first: dict, second: dict) -> int:
+    """Площадь пересечения двух прямоугольников (0, если не пересекаются)."""
+    width = min(first["right"], second["right"]) - max(first["left"], second["left"])
+    height = min(first["bottom"], second["bottom"]) - max(first["top"], second["top"])
+    return max(0, width) * max(0, height)
+
+
+def rect_area(rect: dict) -> int:
+    return max(0, rect["right"] - rect["left"]) * max(0, rect["bottom"] - rect["top"])
+
+
+def occlusion_report(rect: dict, above: list[tuple[int, str, dict]],
+                     threshold: float = 0.2) -> dict:
+    """Перекрыто ли окно — считается по окнам ВЫШЕ него в Z-порядке.
+
+    Захват кадра читает прямоугольник ЭКРАНА, а не содержимое окна: если поверх лежит
+    чужое окно, то и скриншот, и OCR отдают чужое содержимое (замер 19.10: «окно Opera»
+    прочиталось как интерфейс ZCode, 209 слов не по теме). Поэтому «видно ли окно» —
+    отдельный факт, и он обязан доезжать до модели.
+
+    `above` — список (hwnd, заголовок, прямоугольник) окон выше целевого, сверху вниз.
+    Доли пересечений суммируются (при нескольких наложениях возможен двойной счёт) и
+    ограничиваются единицей; `covered` — когда суммарная доля выше порога.
+    """
+    area = rect_area(rect)
+    if area <= 0:
+        return {"covered": False, "share": 0.0, "by": [], "reason": "нулевая площадь окна"}
+    offenders: list[dict] = []
+    share = 0.0
+    for hwnd, title, other in above:
+        overlap = intersection_area(rect, other)
+        if overlap <= 0:
+            continue
+        part = overlap / area
+        share += part
+        if part >= 0.02:
+            offenders.append({"hwnd": int(hwnd), "title": (title or "")[:80],
+                              "share": round(part, 2)})
+    share = min(1.0, share)
+    return {"covered": share >= threshold, "share": round(share, 2),
+            "by": sorted(offenders, key=lambda item: -item["share"])[:3]}
+
+
+_GW_HWNDNEXT = 2
+
+
+def _user32():
+    library = ctypes.WinDLL("user32", use_last_error=True)
+    library.GetTopWindow.restype = wintypes.HWND
+    library.GetWindow.argtypes = [wintypes.HWND, wintypes.UINT]
+    library.GetWindow.restype = wintypes.HWND
+    return library
+
+
+def _window_rect(hwnd: int) -> dict:
+    raw = wintypes.RECT()
+    if not _user32().GetWindowRect(wintypes.HWND(hwnd), ctypes.byref(raw)):
+        return {"left": 0, "top": 0, "right": 0, "bottom": 0}
+    return {"left": raw.left, "top": raw.top, "right": raw.right, "bottom": raw.bottom}
+
+
+def windows_above(hwnd: int) -> list[tuple[int, str, dict]]:
+    """Окна выше заданного в Z-порядке (сверху вниз): только видимые и не свёрнутые.
+
+    Идём от самого верхнего окна вниз по `GetWindow(GW_HWNDNEXT)` и останавливаемся на
+    целевом — всё, что собрано до него, и есть потенциальные перекрытия.
+    """
+    user32 = _user32()
+    above: list[tuple[int, str, dict]] = []
+    current = user32.GetTopWindow(None)
+    while current:
+        handle = int(current)
+        if handle == int(hwnd):
+            break
+        if user32.IsWindowVisible(current) and not user32.IsIconic(current):
+            length = user32.GetWindowTextLengthW(current)
+            title = ""
+            if length:
+                buffer = ctypes.create_unicode_buffer(length + 1)
+                user32.GetWindowTextW(current, buffer, length + 1)
+                title = buffer.value
+            above.append((handle, title, _window_rect(handle)))
+        current = user32.GetWindow(current, _GW_HWNDNEXT)
+    return above
+
+
+def window_occlusion(hwnd: int) -> dict:
+    """Что реально видно в прямоугольнике окна: свёрнуто ли оно и кто его перекрывает."""
+    user32 = _user32()
+    facts: dict = {"minimized": bool(user32.IsIconic(wintypes.HWND(hwnd)))}
+    facts.update(occlusion_report(_window_rect(hwnd), windows_above(hwnd)))
+    return facts
+
+
 class Monitor:
     """Монитор: прямоугольник в физических пикселях и его DPI."""
 

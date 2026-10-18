@@ -91,7 +91,13 @@ def _tool_schemas() -> list[dict]:
 
 
 #: Сколько знаков о результате инструмента уходит модели (см. tool_payload).
-TOOL_PAYLOAD_LIMIT = 2400
+#: 2400 было мало: OCR окна отдаёт 200+ слов, и модель видела только ярлыки вкладок —
+#: с этого начался провал «YouTube есть, а видимости нет» (лог владельца 19.10).
+TOOL_PAYLOAD_LIMIT = 6000
+
+#: Уровни усечения списков, если ответ всё ещё не влезает. Начинается с «отдать всё»:
+#: раньше первым же шагом список ужимался до 12 записей и терял самое важное.
+_SHRINK_STEPS = (None, 200, 60, 20, 8, 3, 1)
 
 #: Слова-маркеры обрыва связи с браузером (CdpTransportError и его причины):
 #: по ним ассистент отличает «живая сессия умерла» от «инструмент честно отказал».
@@ -119,18 +125,19 @@ def tool_payload(outcome: dict, limit: int = TOOL_PAYLOAD_LIMIT) -> str:
 
     Раньше уходили только вердикт и краткая сводка — и на вопрос «какие окна
     открыты» модель отвечала, что система вернула одно число: названия лежали
-    в detail и до неё просто не доезжали. Усечение сначала по числу записей
-    в списках, затем по длине строки — факты вместо счётчиков.
+    в detail и до неё просто не доезжали. Усечение начинается с «отдать всё» и
+    только при переполнении ужимает списки (шаги _SHRINK_STEPS) — редкие большие
+    ответы теряют хвост, а не смысл.
     """
     detail = outcome.get("detail") or {}
     head = {"ok": outcome.get("ok"), "summary": outcome.get("summary", ""),
             "reason": outcome.get("reason", "")}
     text = json.dumps({**head, "detail": detail}, ensure_ascii=False, default=str)
-    for keep in (12, 6, 3, 1):
+    for keep in _SHRINK_STEPS:
         if len(text) <= limit:
             break
-        text = json.dumps({**head, "detail": _shrink(detail, keep)},
-                          ensure_ascii=False, default=str)
+        trimmed = detail if keep is None else _shrink(detail, keep)
+        text = json.dumps({**head, "detail": trimmed}, ensure_ascii=False, default=str)
     return text if len(text) <= limit else text[:limit] + " (обрезано)"
 
 
@@ -144,6 +151,13 @@ SYSTEM_PROMPT = """Ты — Джарвис, голосовой ассистен�
   (за один раунд можно несколько), проверяй результат по фактам каждого вызова;
 - в ответе инструмента всегда смотри поле detail: там сами факты (названия окон,
   вкладки, файлы, тексты). Отвечай по ним, а не по одному счётчику из summary;
+- «НЕ НАЙДЕНО» и `found: false` — это ответ «элемента/текста нет», а не сбой:
+  так и говори, без вторичных попыток угадать;
+- на вопросы «видишь ли X на экране», «есть ли X», «открыто ли окно Y» отвечай
+  фактом: `ocr_find` для текста на экране, `windows_list(query=...)` для окон;
+  не проси «дай все слова кадра» — это лишние шаги и лишний шум;
+- если в ответе есть `occlusion.covered` — окно перекрыто другим, в кадре чужое
+  содержимое: скажи об этом честно, а не пересказывай чужой текст;
 - если инструмент отказал — скажи причину и предложи следующий шаг; один и тот же
   вызов с теми же аргументами дважды не повторяй;
 - не выдумывай инструменты и не обещай того, чего не проверил: если не вышло —
@@ -192,6 +206,7 @@ class Assistant:
         if intent is None:
             return {"handled": False}
         action, args = intent["action"], dict(intent["args"])
+        answer: str | None = None  # фраза по факту (когда результат нельзя предсказать)
         if action == "navigate":
             outcome = self._ensure_browser(args["url"])
         elif action == "navigate_search":
@@ -213,12 +228,31 @@ class Assistant:
         elif action == "screenshot":
             target = str(self.log_dir / time.strftime("shot_%H%M%S.png"))
             outcome = self._live("live_screenshot", {"path": target})
+        elif action == "screen_look":
+            # вопрос к глазам: ответ строится по факту кадра, а не по шаблону
+            outcome = self._call_tool("ocr_find", {"text": args["text"]})
+            detail = outcome.get("detail") or {}
+            label = args.get("label", args["text"])
+            if detail.get("found"):
+                point = (detail.get("matches") or [{}])[0].get("rect") or [0, 0, 0, 0]
+                answer = (f"Да, {label} видно на экране — "
+                          f"в районе {point[0]}x{point[1]}.")
+            else:
+                answer = f"Нет, {label} на экране не вижу."
+                blocked = (detail.get("occlusion") or {})
+                if blocked.get("covered"):
+                    who = (blocked.get("by") or [{}])[0].get("title", "")
+                    answer += f" Часть экрана закрыта другим окном ({who[:40]})."
         elif action == "video_next":
             outcome = {"ok": False, "reason": "переключение видео пока не подключено"}
         else:
             outcome = {"ok": False, "reason": f"неизвестный интент {action}"}
-        say = intent["say"] if outcome.get("ok") else (
-            "Не вышло: " + (outcome.get("reason") or "неизвестная причина")[:120])
+        if answer is not None:
+            say = answer
+        elif outcome.get("ok"):
+            say = intent["say"]
+        else:
+            say = "Не вышло: " + (outcome.get("reason") or "неизвестная причина")[:120]
         self.dialogue.remember("user", text)
         self.dialogue.remember("assistant", say, kind="local")
         self._log("local_intent", text=text, action=action, ok=outcome.get("ok"),

@@ -40,7 +40,7 @@ LOG_PATH = Path(__file__).resolve().parents[1] / "logs" / "mcp_calls.log"
 # набора — сознательная операция: стоп-лист безопасности работает «отсутствием».
 TOOL_NAMES = frozenset({
     "windows_list", "element_find", "element_text", "content_map", "ocr_window",
-    "window_activate", "click_node", "type_text", "hotkey",
+    "ocr_find", "window_activate", "click_node", "type_text", "hotkey",
     "notepad_run", "word_pdf_run", "browser_links_run", "health",
     "fs_trash_move", "fs_sort_by_type",
     "word_report_from_template", "word_format_document", "excel_workbook_build",
@@ -162,9 +162,28 @@ def _fail(tool: str, started: float, reason: str, refused: bool = False,
 # --- восприятие ------------------------------------------------------------------
 
 
+def filter_windows(rows: list[dict], query: str = "") -> list[dict]:
+    """Отбор окон по подстроке в заголовке или имени процесса (регистр не важен).
+
+    Точечный вопрос («открыт ли Блокнот?») не должен зависеть от того, сколько всего
+    окон в системе: с `query` в ответ идёт только совпавшее, и усечение больших
+    списков его не съедает (находка аудита v23).
+    """
+    needle = query.strip().lower()
+    if not needle:
+        return rows
+    return [row for row in rows
+            if needle in str(row.get("title", "")).lower()
+            or needle in str(row.get("exe", "")).lower()]
+
+
 @server.tool(structured_output=True)
-def windows_list() -> ToolResult:
-    """Список верхнеуровневых окон (hwnd, pid, процесс, заголовок, прямоугольник)."""
+def windows_list(query: str = "") -> ToolResult:
+    """Список верхнеуровневых окон (hwnd, pid, процесс, заголовок, прямоугольник).
+
+    `query` — фильтр по подстроке в заголовке или процессе: «открыт ли Блокнот?»
+    решается одним вызовом и не зависит от числа остальных окон.
+    """
     started = time.perf_counter()
     try:
         from .uia import enum_windows
@@ -172,8 +191,14 @@ def windows_list() -> ToolResult:
         rows = enum_windows()
     except Exception as exc:  # noqa: BLE001
         return _fail("windows_list", started, f"{type(exc).__name__}: {exc}")
-    result = ToolResult(ok=True, summary=f"окон: {len(rows)}", detail={"windows": rows})
-    _journal("windows_list", started, result, {})
+    matched = filter_windows(rows, query)
+    summary = f"окон: {len(rows)}"
+    if query.strip():
+        summary = (f"по запросу {query.strip()!r}: {len(matched)} из {len(rows)} окон")
+    result = ToolResult(ok=True, summary=summary,
+                        detail={"windows": matched, "total": len(rows),
+                                "query": query.strip(), "found": len(matched)})
+    _journal("windows_list", started, result, {"query": query})
     return result
 
 
@@ -194,13 +219,20 @@ def element_find(hwnd: int, name: str = "", control_type: str = "",
         return _fail("element_find", started, f"{type(exc).__name__}: {exc}",
                      hwnd=hwnd, name=name)
     if not node:
-        result = ToolResult(ok=True, refused=False, summary="элемент не найден",
-                            detail={"found": False})
+        # «Не найдено» — не сбой и не отказ: инструмент отработал, элемента нет.
+        # Но и не «ок» без пояснений: модель должна читать это как отсутствие элемента,
+        # а не как успех (в живом прогоне владельца ok=True без found путало вывод).
+        result = ToolResult(ok=True, refused=False,
+                            summary=f"НЕ НАЙДЕНО: элемента "
+                                    f"{(name or control_type or automation_id)!r} в окне {hwnd} нет",
+                            detail={"found": False, "status": "not_found",
+                                    "query": {"name": name, "control_type": control_type,
+                                              "automation_id": automation_id}})
         _journal("element_find", started, result, {"hwnd": hwnd, "name": name})
         return result
     found = {"ok": True, "summary": f"найдено: {node.get('name', '')!r}",
              "refused": False, "reason": "",
-             "detail": {"found": True, "node": node}}
+             "detail": {"found": True, "status": "found", "node": node}}
     result = ToolResult(**found)
     _journal("element_find", started, result, {"hwnd": hwnd, "name": name})
     return result
@@ -227,42 +259,175 @@ def element_text(hwnd: int, max_length: int = 4000) -> ToolResult:
 
 
 @server.tool(structured_output=True)
-def content_map(hwnd: int, depth: int = 3) -> ToolResult:
-    """Карта дерева окна (UIA): тип, имя,automation_id, прямоугольник; до depth уровней."""
+def content_map(hwnd: int, depth: int = 3, query: str = "") -> ToolResult:
+    """Карта дерева окна (UIA): тип, имя, automation_id, прямоугольник; до depth уровней.
+
+    `query` — фильтр по имени/automation_id: в дереве Chromium-окон тысячи узлов,
+    и без фильтра ответ тонет. Обход таких окон нередко отваливается на уровне COM —
+    это состояние окна, а не поломка инструмента, поэтому отказ приходит с советом.
+    """
     started = time.perf_counter()
     try:
         _ensure_com()
         client = _automation()
         walked = client.walk(client.window(hwnd), depth=depth, scope="deep")
-        nodes = walked.get("nodes", [])[:600]
-    except Exception as exc:  # noqa: BLE001
-        return _fail("content_map", started, f"{type(exc).__name__}: {exc}",
-                     hwnd=hwnd, depth=depth)
-    result = ToolResult(ok=True, summary=f"узлов: {len(nodes)} (обрезано, лимит 600)",
-                        detail={"count": len(nodes), "nodes": nodes})
-    _journal("content_map", started, result, {"hwnd": hwnd, "depth": depth})
+        nodes = walked.get("nodes", [])
+    except Exception as exc:  # noqa: BLE001 — дерево недоступно: это вердикт, не сбой
+        return _fail("content_map", started,
+                     f"дерево окна недоступно ({type(exc).__name__}: {exc}). "
+                     "У окон Chromium/Electron обход дерева часто отваливается: "
+                     "используй element_find с именем/типом или ocr_find по тексту — "
+                     "они работают точечно и не зависят от полного обхода", hwnd=hwnd)
+    needle = query.strip().lower()
+    matched = [node for node in nodes
+               if not needle or needle in str(node.get("name", "")).lower()
+               or needle in str(node.get("automation_id", "")).lower()]
+    limit = 600
+    shown = matched[:limit]
+    summary = f"узлов: {len(shown)}"
+    if needle:
+        summary = f"по запросу {query.strip()!r}: {len(matched)} из {len(nodes)} узлов"
+    elif len(matched) > limit:
+        summary = (f"узлов: {len(shown)} (обрезано из {len(matched)}; "
+                   "уточни query — выгружать всё дерево бессмысленно)")
+    result = ToolResult(ok=True, summary=summary,
+                        detail={"count": len(shown), "matched": len(matched),
+                                "total": len(nodes), "query": query.strip(),
+                                "nodes": shown})
+    _journal("content_map", started, result, {"hwnd": hwnd, "depth": depth, "query": query})
     return result
 
 
+def _screens_word_lines(words: list) -> list[dict]:
+    """Склейка слов OCR в строки: 40 строк читаются моделью лучше, чем 209 слов.
+
+    Усечение словарного списка съедало самое главное (в логе владельца модель
+    получила только ярлыки вкладок), поэтому рядом со словами едут строки —
+    компактно и без потери смысла.
+    """
+    lines: dict[int, list] = {}
+    for word in words:
+        lines.setdefault(word.line_index, []).append(word)
+    result: list[dict] = []
+    for index in sorted(lines):
+        row = sorted(lines[index], key=lambda item: item.rect["left"])
+        result.append({"text": " ".join(item.text for item in row).strip(),
+                       "y": min(item.rect["top"] for item in row),
+                       "x": min(item.rect["left"] for item in row)})
+    return [line for line in result if line["text"]]
+
+
+def _ocr_frame(hwnd: int = 0):
+    """Кадр для OCR: весь экран (hwnd=0) или видимая часть окна. Возвращает (image, origin)."""
+    grabber = _screen()
+    frame = grabber.grab(timeout_s=2.0)
+    if not hwnd:
+        return frame.image, (frame.origin[0], frame.origin[1])
+    crop = grabber.crop_window(_coordinate_space(), hwnd, frame)
+    return crop.image, (crop.origin[0], crop.origin[1])
+
+
 @server.tool(structured_output=True)
-def ocr_window(hwnd: int) -> ToolResult:
-    """OCR окна: кроп видимой части + встроенный OCR Windows; слова в экранных координатах."""
+def ocr_window(hwnd: int, query: str = "") -> ToolResult:
+    """OCR окна: кроп видимой части + встроенный OCR Windows; строки и слова.
+
+    В ответе — строки целиком (читаемо), первые слова и признак перекрытия:
+    кадр читается с ЭКРАНА, поэтому поверх окна могло лечь чужое — об этом честно
+    сообщается, вместо того чтобы выдавать чужой текст за содержимое окна.
+    """
     started = time.perf_counter()
+    from .geometry import window_occlusion
     from .screen import ScreenCaptureError
 
     try:
-        frame = _screen().crop_window(_coordinate_space(), hwnd,
-                                      _screen().grab(timeout_s=2.0))
-        words = _ocr().recognize(frame.image, offset=(frame.origin[0], frame.origin[1]))
+        image, origin = _ocr_frame(hwnd)
+        words = _ocr().recognize(image, offset=origin)
     except ScreenCaptureError as exc:
         return _fail("ocr_window", started, f"захват экрана отказал: {exc}",
                      refused=True, hwnd=hwnd)
     except Exception as exc:  # noqa: BLE001
         return _fail("ocr_window", started, f"{type(exc).__name__}: {exc}", hwnd=hwnd)
-    rows = [w.to_dict() for w in words]
-    result = ToolResult(ok=True, summary=f"слов: {len(rows)}",
-                        detail={"words": rows, "ms": round(_ocr().last_ms or 0.0, 1)})
-    _journal("ocr_window", started, result, {"hwnd": hwnd})
+    needle = query.strip().lower()
+    picked = [word for word in words if not needle or needle in word.text.lower()]
+    rows = [word.to_dict() for word in picked]
+    lines = _screens_word_lines(picked)
+    occlusion = window_occlusion(hwnd)
+    summary = f"слов: {len(rows)}, строк: {len(lines)}"
+    if needle:
+        summary = f"по запросу {query.strip()!r}: слов {len(rows)} из {len(words)}"
+    if occlusion.get("covered"):
+        summary += (f"; ВНИМАНИЕ: окно перекрыто ({int(occlusion['share'] * 100)}% "
+                    f"площади) — в кадре видно чужое окно")
+    result = ToolResult(ok=True, summary=summary,
+                        detail={"lines": lines[:80], "line_count": len(lines),
+                                # координаты нужны только при точечном поиске; полный
+                                # список слов дублировал бы строки и съедал бюджет
+                                "words": rows[:40] if needle else [],
+                                "word_count": len(rows), "total_words": len(words),
+                                "query": query.strip(), "occlusion": occlusion,
+                                "ms": round(_ocr().last_ms or 0.0, 1)})
+    _journal("ocr_window", started, result, {"hwnd": hwnd, "query": query})
+    return result
+
+
+@server.tool(structured_output=True)
+def ocr_find(text: str, hwnd: int = 0, exact: bool = False,
+             limit: int = 12) -> ToolResult:
+    """Есть ли текст на экране (или в окне) и где именно — прямой ответ на «видишь X?».
+
+    Без `hwnd` читается весь экран, с `hwnd` — видимая часть окна. Ответ короткий:
+    найдено/нет, сколько вхождений, координаты первых и текст строк, где нашлось.
+    Если окно перекрыто другим, это отдельный факт: содержимое кадра в этом случае
+    чужое, и подменять им реальность нельзя.
+    """
+    started = time.perf_counter()
+    from .geometry import window_occlusion
+    from .ocr import WindowsOcr
+    from .screen import ScreenCaptureError
+
+    needle = text.strip()
+    if not needle:
+        return _fail("ocr_find", started, "пустой запрос: что искать?", True)
+    try:
+        image, origin = _ocr_frame(hwnd)
+        words = _ocr().recognize(image, offset=origin)
+    except ScreenCaptureError as exc:
+        return _fail("ocr_find", started, f"захват экрана отказал: {exc}",
+                     refused=True, hwnd=hwnd)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("ocr_find", started, f"{type(exc).__name__}: {exc}", hwnd=hwnd)
+    matches = WindowsOcr.find(words, needle, exact=exact)
+    found_rows = [word.to_dict() for word in matches][:limit]
+    context: list[dict] = []
+    if matches:
+        by_line: dict[int, list] = {}
+        for word in words:
+            by_line.setdefault(word.line_index, []).append(word)
+        for index in sorted({word.line_index for word in matches})[:6]:
+            row = sorted(by_line.get(index, []), key=lambda item: item.rect["left"])
+            line_text = " ".join(item.text for item in row).strip()
+            if line_text:
+                context.append({"text": line_text,
+                                "y": min(item.rect["top"] for item in row)})
+    occlusion = window_occlusion(hwnd) if hwnd else {}
+    detail = {"found": bool(matches), "count": len(matches), "matches": found_rows,
+              "lines": context[:6], "words_in_frame": len(words),
+              "scope": f"окно {hwnd}" if hwnd else "весь экран",
+              "ms": round(_ocr().last_ms or 0.0, 1)}
+    if occlusion:
+        detail["occlusion"] = occlusion
+    if matches:
+        first = matches[0]
+        centre = first.center
+        summary = (f"найдено {len(matches)} вхождений {needle!r}; "
+                   f"первое — {centre[0]}x{centre[1]}")
+    else:
+        summary = (f"НЕ НАЙДЕНО: {needle!r} "
+                   f"({'в окне' if hwnd else 'на экране'}) — слов в кадре: {len(words)}")
+        if occlusion.get("covered"):
+            summary += f"; окно перекрыто: {occlusion.get('by', [{}])[0].get('title', '')[:40]}"
+    result = ToolResult(ok=True, refused=False, summary=summary, detail=detail)
+    _journal("ocr_find", started, result, {"text": needle, "hwnd": hwnd})
     return result
 
 
