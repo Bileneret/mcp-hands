@@ -29,7 +29,15 @@ from ..mcp_server import (browser_links_run, click_node, content_map, element_fi
                           fs_trash_move, health, hotkey, notepad_run, ocr_window,
                           type_text, window_activate, windows_list,
                           word_format_document, word_pdf_run, word_report_from_template)
+from ..checkpoints import CheckpointStore
 from .plan import Plan
+
+# Действия, меняющие файлы: для них делается чекпойнт путей из args.
+MUTATING_ACTIONS = frozenset({
+    "word_report_from_template", "word_format_document",
+    "excel_workbook_build", "fs_trash_move"})
+# Действие, которое ПОСТОЯННО перемещает (откат — отдельная механика, не файл-копия)
+TRANSACTIONAL_NOTE = {"fs_sort_by_type": "перемещение; откат чекпойнтом не покрывается"}
 
 # Статическая таблица диспетчеризации: имя инструмента → функция ядра.
 # Функции mcp_server несут те же стражи, что и MCP-инструменты (это один код).
@@ -66,6 +74,25 @@ class RunnerLimits:
     max_task_replans: int = 2
     max_cumulative_tokens: int = 8192
     dry_run_actions: bool = False  # прогонять каждый шаг с dry_run=True перед боем
+    # Чекпойнты применяются, только если runner получил store (см. `run_plan`).
+    snapshot_mutating: bool = True
+
+
+def _snapshot_paths(args: dict) -> list[str]:
+    """Пути из args, подлежащие чекпойнту (только существующие файлы)."""
+    paths: list[str] = []
+
+    def push(value) -> None:
+        if isinstance(value, str):
+            paths.append(value)
+        elif isinstance(value, list):
+            paths.extend(item for item in value if isinstance(item, str))
+
+    for key in ("template", "path", "save_as", "output", "paths", "inputs"):
+        push(args.get(key))
+    from pathlib import Path
+
+    return [p for p in paths if Path(p).is_file()]
 
 
 @dataclass
@@ -83,6 +110,7 @@ class StepOutcome:
     expect_ok: bool = False
     evidence: str = ""
     disputed: bool = False  # L1 и L2 разошлись (этап 4)
+    rolled_back: bool = False  # файлы восстановлены из чекпойнта (этап 4)
 
 
 @dataclass
@@ -102,7 +130,8 @@ class PlanRun:
                 "steps": [{"index": s.index, "action": s.action, "ok": s.ok,
                            "attempts": s.attempts, "expect": s.expect_kind,
                            "expect_ok": s.expect_ok, "ignored_args": s.ignored_args,
-                           "disputed": s.disputed, "reason": s.reason} for s in self.steps],
+                           "disputed": s.disputed, "rolled_back": s.rolled_back,
+                           "reason": s.reason} for s in self.steps],
                 "total_ms": round(self.total_ms, 1), "replans": self.replans,
                 "cumulative_tokens": self.cumulative_tokens}
 
@@ -111,12 +140,16 @@ def _filter_args(action_fn, raw_args: dict) -> tuple[dict, list[str], str | None
     """Разбивает выход модели на вызываемые и лишние аргументы.
 
     Возвращает (вызываемые, ignored, fatal_reason). Нехватка обязательных
-    параметров (без значения по умолчанию) — фатальная для шага.
+    параметров (без значения по умолчанию) — фатальная для шага. Функции с
+    `**kwargs` принимают всё, что передала модель (VAR_KEYWORD).
     """
     if not isinstance(raw_args, dict):
         return {}, [], f"args должны быть словарём, пришло {type(raw_args).__name__}"
     signature = inspect.signature(action_fn)
-    required = [name for name, param in signature.parameters.items()
+    parameters = list(signature.parameters.values())
+    if any(param.kind == inspect.Parameter.VAR_KEYWORD for param in parameters):
+        return dict(raw_args), [], None
+    required = [param.name for param in parameters
                 if param.default is inspect.Parameter.empty
                 and param.kind in (inspect.Parameter.POSITIONAL_OR_KEYWORD,
                                    inspect.Parameter.KEYWORD_ONLY)]
@@ -252,7 +285,7 @@ def _verify_step_artifact(result: ToolResult, verifier, outcome: StepOutcome) ->
 
 def run_plan(plan: Plan, limits: RunnerLimits | None = None,
              llm_request_plan=None, memory=None, plan_source: str = "scripted",
-             verifier=None) -> PlanRun:
+             verifier=None, checkpoints: CheckpointStore | None = None) -> PlanRun:
     """Исполняет план по шагам (замкнутый цикл).
 
     `llm_request_plan(plan, failed_outcome) -> Plan | None` — необязательный
@@ -285,6 +318,16 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
         outcome = StepOutcome(index=position + 1, action=step.action,
                               expect_kind=step.expect.kind)
         step_started = time.perf_counter()
+        checkpoint = None
+        if checkpoints is not None and step.action in MUTATING_ACTIONS \
+                and limits.snapshot_mutating:
+            paths = _snapshot_paths(step.args)
+            if paths:
+                try:
+                    checkpoint = checkpoints.create(plan.task_id, position + 1, paths)
+                except OSError as exc:  # noqa: BLE001 — чекпойнт не должен ломать прогон
+                    outcome.evidence = (outcome.evidence + "; снапшот не создан: "
+                                        f"{exc}").strip("; ")
         for attempt in range(1, max(1, limits.attempts_per_step) + 1):
             outcome.attempts = attempt
             call_args, ignored, fatal = _filter_args(action_fn, step.args)
@@ -334,6 +377,15 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
             outcome.reason = ""
             break
         outcome.ms = (time.perf_counter() - step_started) * 1000.0
+        # Транзакционный откат: неуспех изменяющего шага - файлы возвращаются
+        # к состоянию до шага (из манифеста чекпойнта, с проверкой хэша).
+        if checkpoint is not None and not outcome.ok:
+            rollback_data = checkpoints.rollback(checkpoint)
+            if rollback_data.get("restored") or rollback_data.get("removed_appeared"):
+                outcome.rolled_back = True
+            if memory is not None and rollback_data.get("missing_backups"):
+                memory.record_incident(run_id, "rollback_failed", step.action,
+                                       f"потеряны бэкапы: {rollback_data['missing_backups']}")
         run.steps.append(outcome)
         if memory is not None:
             memory.record_step(run_id, outcome)
