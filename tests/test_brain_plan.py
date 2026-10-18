@@ -25,10 +25,10 @@ def test_benchmark_registry_is_honest():
     ids = {task.id for task in TASKS}
     assert len(ids) == 10 and all(tid.startswith("b") for tid in ids)
     covered = {t.id for t in TASKS if set(t.needs) <= TOOL_NAMES}
-    assert covered == {"b01", "b02", "b03", "b04", "b05", "b06", "b08", "b09", "b10"}, (
+    assert covered == {"b01", "b02", "b03", "b04", "b05", "b06", "b07", "b08", "b09", "b10"}, (
         "набор инструментов изменился — обнови ожидание этого стража и реестр "
         f"в suite (scripted-планы/стенды); сейчас покрыты: {sorted(covered)}; "
-        f"непокрытой должна оставаться только b07 (YouTube, решение владельца)")
+        "при полном покрытии все десять задач DESIGN §7 должны быть готовы")
     for row in report["tasks"]:
         if row["ready"]:
             assert row["missing_tools"] == []

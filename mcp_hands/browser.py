@@ -142,6 +142,106 @@ def extract_article(url: str, profile_root: str | Path | None = None) -> dict:
     return report
 
 
+VIDEO_JS_SET_RATE = """
+(() => {
+  const player = document.querySelector('video#player');
+  if (!player) return {error: 'нет video#player'};
+  const before = player.playbackRate;
+  player.playbackRate = RATE_VALUE;
+  return {before: before, after: player.playbackRate};
+})()
+"""
+
+VIDEO_JS_READ = """
+(() => {
+  const player = document.querySelector('video#player');
+  const cues = Array.from(document.querySelectorAll('#transcript .cue')).map(cue => ({
+    start: (cue.getAttribute('data-start') || '').trim(),
+    end: (cue.getAttribute('data-end') || '').trim(),
+    text: (cue.textContent || '').trim(),
+  }));
+  return {
+    title: (document.querySelector('h1')?.textContent || document.title || '').trim(),
+    duration: player ? (player.getAttribute('data-duration') || '').trim() : '',
+    rate: player ? player.playbackRate : null,
+    cues: cues,
+  };
+})()
+"""
+
+
+def video_capture(url: str, output_json: str, output_notes: str,
+                  playback_rate: float = 1.5,
+                  profile_root: str | Path | None = None) -> dict:
+    """Задача b07 на локальном медиа-стенде: плеер, скорость, таймкоды → заметки.
+
+    Контракт страницы: `video#player` (duration в `data-duration`), реплики в
+    `#transcript .cue` с `data-start`/`data-end`, заголовок в `h1`.
+    Инструмент: выставляет `playbackRate`, читает реплики, пишет JSON-отчёт и
+    заметки с таймкодами. Постусловие: заметки содержат столько же строк-таймкодов,
+    сколько реплик на странице; фактическая скорость на странице == заказанной
+    (перечитывание ПОСЛЕ установки).
+    """
+    profile_root = Path(profile_root) if profile_root else \
+        Path(output_json).resolve().parent / "browser_profile"
+    session = BrowserSession(profile_root)
+    report: dict = {"ok": False, "url": url, "rate_requested": playback_rate}
+    try:
+        session.start()
+        tab = session.open(url)
+        session.cdp.connect(tab["webSocketDebuggerUrl"])
+        session.cdp.call("Page.enable")
+        session.cdp.call("Page.navigate", url=url)
+        time.sleep(1.0)
+        rate_result = session.cdp.call(
+            "Runtime.evaluate",
+            expression=VIDEO_JS_SET_RATE.replace("RATE_VALUE", str(float(playback_rate))),
+            returnByValue=True)["result"]["value"]
+        if rate_result.get("error"):
+            report["reason"] = rate_result["error"]
+            return report
+        report["rate_before"] = rate_result.get("before")
+        report["rate_after"] = rate_result.get("after")
+        data = session.cdp.call("Runtime.evaluate", expression=VIDEO_JS_READ,
+                                returnByValue=True)["result"]["value"]
+        cues = [cue for cue in data.get("cues", []) if cue.get("start")]
+        if not cues:
+            report["reason"] = "на странице нет реплик с таймкодами (#transcript .cue)"
+            return report
+        report.update({"title": data.get("title", ""), "duration": data.get("duration", ""),
+                       "cues": len(cues)})
+        json_target = Path(output_json)
+        json_target.parent.mkdir(parents=True, exist_ok=True)
+        json_target.write_text(json.dumps(
+            {"title": data.get("title", ""), "duration": data.get("duration", ""),
+             "playback_rate": report["rate_after"], "cues": cues},
+            ensure_ascii=False, indent=1), encoding="utf-8")
+        notes_target = Path(output_notes)
+        note_lines = [f"# {data.get('title', '')}", f"Длительность: {data.get('duration', '')}",
+                      f"Скорость просмотра: {report['rate_after']}x", "",
+                      "## Таймкоды"]
+        note_lines += [f"- [{cue['start']}–{cue['end']}] {cue['text']}" for cue in cues]
+        notes_target.write_text("\n".join(note_lines) + "\n", encoding="utf-8")
+        # постусловия: заметки содержат каждый таймкод; скорость на странице фактическая
+        notes_text = notes_target.read_text(encoding="utf-8")
+        missing = [cue["start"] for cue in cues if cue["start"] not in notes_text]
+        rate_ok = abs(float(report["rate_after"] or 0) - float(playback_rate)) < 1e-6
+        report["cues_in_notes"] = len(cues) - len(missing)
+        report["notes_file"] = str(notes_target)
+        report["json_file"] = str(json_target)
+        report["ok"] = (not missing and rate_ok and json_target.is_file()
+                        and notes_target.is_file())
+        if missing:
+            report["reason"] = f"в заметках нет таймкодов: {missing[:3]}"
+        elif not rate_ok:
+            report["reason"] = f"скорость на странице {report['rate_after']}, заказано {playback_rate}"
+    except Exception as exc:  # noqa: BLE001
+        report["reason"] = f"{type(exc).__name__}: {str(exc)[:160]}"
+    finally:
+        report["cleanup_killed"] = session.stop()
+    return report
+
+
 def tabs_audit(urls: list[str], output: str, keep: list[str] | None = None,
                close_extras: bool = True, profile_root: str | Path | None = None) -> dict:
     """Разбор сессии вкладок: открыть заданные, сгруппировать по домену, сохранить

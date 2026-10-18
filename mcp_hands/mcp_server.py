@@ -45,7 +45,7 @@ TOOL_NAMES = frozenset({
     "fs_trash_move", "fs_sort_by_type",
     "word_report_from_template", "word_format_document", "excel_workbook_build",
     "browser_tabs_audit", "browser_collect_sources",
-    "browser_extract_text", "word_docx_to_pdf"})
+    "browser_extract_text", "word_docx_to_pdf", "browser_video_capture"})
 
 server = MCPServer(
     name="mcp-hands",
@@ -952,6 +952,34 @@ def word_docx_to_pdf(path: str, output_pdf: str) -> ToolResult:
                         summary=f"PDF {detail['bytes']} байт, знаков {detail['text_chars']}",
                         detail=detail)
     _journal("word_docx_to_pdf", started, result, {"path": path})
+    return result
+
+
+@server.tool(structured_output=True)
+def browser_video_capture(url: str, output_json: str, output_notes: str,
+                          playback_rate: float = 1.5) -> ToolResult:
+    """Задача «медиа» на ЛОКАЛЬНОМ стенде: плеер, скорость, таймкоды → заметки.
+
+    Контракт страницы: `video#player` (длительность в `data-duration`), реплики
+    в `#transcript .cue` (`data-start`/`data-end`), заголовок в `h1`.
+    Инструмент выставляет `playbackRate`, выписывает таймкоды в заметки и JSON.
+    Постусловия: заметки содержат каждый таймкод; фактическая скорость страницы
+    равна заказанной (перечитывание ПОСЛЕ установки). Внешний веб не используется.
+    """
+    started = time.perf_counter()
+    from pathlib import Path as _Path
+
+    from .browser import video_capture
+
+    profile_root = _Path(output_json).parent / "browser_profile"
+    outcome = video_capture(url, output_json, output_notes, playback_rate=playback_rate,
+                            profile_root=profile_root)
+    result = ToolResult(ok=bool(outcome.get("ok")), refused=False,
+                        reason=outcome.get("reason", ""),
+                        summary=(f"таймкодов {outcome.get('cues', 0)} → заметки "
+                                 f"({outcome.get('notes_file', '')})"),
+                        detail=outcome)
+    _journal("browser_video_capture", started, result, {"url": url})
     return result
 
 

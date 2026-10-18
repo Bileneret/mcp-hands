@@ -268,6 +268,33 @@ def _stand_lab_report(workdir: Path) -> dict:
     return {"plan": plan, "stand": str(workdir)}
 
 
+VIDEO_PAGE = ("<html><head><title>Стенд медиа</title></head><body>"
+              "<h1>Практика автоматизации: разбор записи</h1>"
+              '<video id="player" data-duration="03:20"></video>'
+              '<div id="transcript">'
+              '<span class="cue" data-start="00:00" data-end="00:24">Введение: цель записи.</span>'
+              '<span class="cue" data-start="00:24" data-end="01:02">Обзор инструмента.</span>'
+              '<span class="cue" data-start="01:02" data-end="02:10">Разбор методики.</span>'
+              '<span class="cue" data-start="02:10" data-end="03:20">Выводы и итоги.</span>'
+              "</div></body></html>")
+
+
+def _stand_video_notes(workdir: Path) -> dict:
+    """Стенд задачи b07: локальная медиа-страница (плеер + реплики) → заметки
+    с таймкодами и выбранной скоростью. Живой YouTube сознательно не используется."""
+    page = workdir / "видео.html"
+    page.write_text(VIDEO_PAGE, encoding="utf-8")
+    report_json = workdir / "видео_отчёт.json"
+    notes = workdir / "заметки_по_видео.md"
+    plan = {"task_id": "b07", "steps": [
+        {"action": "browser_video_capture",
+         "args": {"url": page.resolve().as_uri(), "output_json": str(report_json),
+                  "output_notes": str(notes), "playback_rate": 1.5},
+         "expect": {"kind": "file_contains",
+                    "params": {"path": str(notes), "needle": "[02:10–03:20]"}}}]}
+    return {"plan": plan, "stand": str(workdir)}
+
+
 STANDS: dict[str, object] = {"b08": _stand_downloads,
                              "b01": _stand_report_from_template,
                              "b02": _stand_format_document,
@@ -275,7 +302,8 @@ STANDS: dict[str, object] = {"b08": _stand_downloads,
                              "b06": _stand_tabs_session,
                              "b04": _stand_sources_page,
                              "b05": _stand_extract_article,
-                             "b10": _stand_lab_report}
+                             "b10": _stand_lab_report,
+                             "b07": _stand_video_notes}
 
 
 def _record_missing(task, memory: Memory) -> dict:

@@ -51,16 +51,24 @@ def test_runner_writes_steps_and_incidents_to_memory(memory, tmp_path):
     assert run_row["status"] == "failed"
 
 
-def test_suite_dry_llm_records_all_selected_tasks(tmp_path):
-    """Сьюта на непокрытой задаче: честный missing_tools по именам, без имитации.
-    Единственная непокрытая — b07 (YouTube; замена/факультатив — решение владельца),
-    покрытые задачи растут — при обновлении колонн меняй и выборку этого теста."""
-    summary = run_suite(task_ids=["b07"], db_path=tmp_path / "m.db")
-    assert summary["mode"].startswith("scripted")
-    row = summary["tasks"][0]
-    assert row["status"] == "missing_tools"
-    assert "browser_youtube_capture" in row["reason"]
-    assert summary["passed"] == 0 and summary["missing_tools"] == 1
+def test_missing_tools_is_recorded_honestly(tmp_path):
+    """Механизм честной фиксации непокрытых задач (юнит-уровень): пропуск
+    инструмента не имитируется, а описывается именами в памяти.
+
+    Проверяем напрямую, а не через реестр: полное покрытие десяти задач DESIGN §7
+    делает «живой» пример missing-задачи невозможным — инвариант механизма
+    сохраняем отдельно."""
+    from mcp_hands.benchmark.suite import _record_missing
+    from mcp_hands.benchmark.tasks import BenchmarkTask
+
+    memory = Memory(tmp_path / "m.db")
+    fake = BenchmarkTask("bx", "Фейковая задача", needs=["tool_которого_нет", "второй_нет"])
+    row = _record_missing(fake, memory)
+    assert row["status"] == "missing_tools" and "tool_которого_нет" in row["reason"]
+    statuses = {(r["task_id"], r["status"]): r["runs"]
+                for r in memory.metrics()["by_task_status"]}
+    assert statuses[("bx", "missing_tools")] == 1, statuses
+    memory.close()
 
 
 def test_suite_b08_stand_passes_or_skips_without_recycle_bin(tmp_path):
@@ -114,14 +122,15 @@ def test_suite_b09_stand_passes(tmp_path):
 
 def test_suite_browser_stands_pass(tmp_path):
     """Браузерные стенды колонны C: b06 (сессия вкладок с дубликатом → остались
-    ровно keep) и b04 (источники со страницы → CSV). Внешний веб не используется;
-    при отсутствии Edge тест пропускается с причиной."""
+    ровно keep), b04 (источники со страницы → CSV), b07 (медиа-стенд: скорость
+    и таймкоды → заметки). Внешний веб не используется; при отсутствии Edge
+    тест пропускается с причиной."""
     from mcp_hands.scenarios.browser_links import edge_path
 
     if not edge_path():
         pytest.skip("не найден msedge.exe — браузерные стенды недоступны в этой среде")
-    summary = run_suite(task_ids=["b06", "b04"], db_path=tmp_path / "m.db")
+    summary = run_suite(task_ids=["b06", "b04", "b07"], db_path=tmp_path / "m.db")
     by_id = {row["task_id"]: row for row in summary["tasks"]}
-    assert by_id["b06"]["status"] == "passed", by_id["b06"]
-    assert by_id["b04"]["status"] == "passed", by_id["b04"]
+    for task in ("b06", "b04", "b07"):
+        assert by_id[task]["status"] == "passed", by_id[task]
     assert summary["failed"] == 0, summary
