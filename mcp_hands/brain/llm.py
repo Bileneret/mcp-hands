@@ -61,15 +61,20 @@ class LLMResponse:
     completion_tokens: int = 0
     ms: float = 0.0
     raw: dict = field(default_factory=dict)
+    tool_calls: list = field(default_factory=list)  # режим call_tools: [{id, name, args}]
 
 
 class LLMError(RuntimeError):
     """Отказ провайдера с безопасной формулировкой (без ключа и заголовков)."""
 
 
-def _post_chat(config: LLMConfig, messages: list[dict], timeout_s: float = 60.0) -> LLMResponse:
+def _post_chat(config: LLMConfig, messages: list[dict], timeout_s: float = 60.0,
+               tools: list | None = None) -> LLMResponse:
     body = {"model": config.model, "messages": messages,
             "temperature": config.temperature, "max_tokens": config.max_tokens}
+    if tools:
+        body["tools"] = tools
+        body["tool_choice"] = "auto"
     request = urllib.request.Request(
         f"{config.base_url}/chat/completions",
         data=json.dumps(body).encode("utf-8"),
@@ -91,10 +96,15 @@ def _post_chat(config: LLMConfig, messages: list[dict], timeout_s: float = 60.0)
     except (KeyError, IndexError, TypeError) as exc:
         raise LLMError(f"неожиданный формат ответа провайдера: {str(payload)[:300]}") from exc
     usage = payload.get("usage") or {}
+    message = payload["choices"][0]["message"]
+    tool_calls = [{"id": call.get("id", ""),
+                   "name": (call.get("function") or {}).get("name", ""),
+                   "args": (call.get("function") or {}).get("arguments", "{}")}
+                  for call in (message.get("tool_calls") or [])]
     return LLMResponse(text=text, model=payload.get("model", config.model),
                        prompt_tokens=int(usage.get("prompt_tokens", 0)),
                        completion_tokens=int(usage.get("completion_tokens", 0)),
-                       ms=round(ms, 1), raw=payload)
+                       ms=round(ms, 1), raw=payload, tool_calls=tool_calls)
 
 
 SYSTEM_PROMPT_TEMPLATE = """Ты — планировщик компьютерного агента MCP-Hands (Windows).

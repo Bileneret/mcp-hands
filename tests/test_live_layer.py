@@ -38,10 +38,15 @@ def test_live_work_profile_local_page(tmp_path):
 
 
 def test_user_mode_reports_missing_port_clearly(tmp_path, monkeypatch):
-    """User-режим без отладочного порта: внятный отказ с инструкцией, без действий."""
+    """User-режим без отладочного порта: внятный отказ с инструкцией, без действий.
+
+    Порт подменяется заведомо закрытым (9/discard): тест не зависит от того,
+    поднят ли у владельца отладочный порт на самом деле.
+    """
     import mcp_hands.live as live_mod
 
     monkeypatch.setattr(live_mod, "USER_PORT_FILE", tmp_path / "нет_порта.txt")
+    monkeypatch.setattr(live_mod, "DEFAULT_USER_PORT", 9)
     browser = LiveBrowser()
     outcome = browser.connect_user()
     assert outcome["ok"] is False

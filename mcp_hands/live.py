@@ -39,6 +39,24 @@ def opera_path() -> Path | None:
     return next((candidate for candidate in OPERA_PATHS if candidate.exists()), None)
 
 
+def kill_our_opera(profile: Path) -> int:
+    """Снимает ТОЛЬКО наши экземпляры Opera — отбор строго по пути профиля в
+    командной строке. Браузер владельца (личный профиль) не трогается никогда."""
+    import subprocess
+
+    command = ("Get-CimInstance Win32_Process -Filter \"Name='opera.exe'\" | "
+               f"Where-Object {{ $_.CommandLine -like '*{profile}*' }} | "
+               "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction "
+               "SilentlyContinue; $_.ProcessId }")
+    try:
+        completed = subprocess.run(["powershell", "-NoProfile", "-Command", command],
+                                   capture_output=True, timeout=30)
+        return len([line for line in completed.stdout.decode("utf-8", "replace").split()
+                    if line.isdigit()])
+    except Exception:  # noqa: BLE001 — уборка не должна ломать запуск
+        return 0
+
+
 class LiveBrowser:
     """Настоящий браузер под CDP: рабочий профиль (свой запуск) или пользовательский (подключение)."""
 
@@ -52,10 +70,19 @@ class LiveBrowser:
     # --- жизненный цикл -------------------------------------------------
 
     def start_work(self, headless: bool = True) -> dict:
-        """Свой экземпляр с отдельным профилем — для тестов и автоматики."""
+        """Свой экземпляр с отдельным профилем — для тестов и автоматики.
+
+        Перед запуском снимаются ПРОШЛЫЕ наши экземпляры (по пути профиля):
+        живая сессия живёт до явного stop, а занятый профиль не даёт поднять
+        новый процесс (Opera просто передаёт управление старому) — без этой
+        уборки второй запуск ловил «порт не поднялся».
+        """
         opera = opera_path()
         if opera is None:
             raise RuntimeError("opera.exe не найден (Opera GX / Opera)")
+        killed = kill_our_opera(WORK_PROFILE)
+        if killed:
+            time.sleep(1.5)
         WORK_PROFILE.mkdir(parents=True, exist_ok=True)
         port = free_port()
         args = [str(opera), f"--remote-debugging-port={port}",
@@ -117,7 +144,6 @@ class LiveBrowser:
             self.process = None
         self.mode = ""
         return {"stopped": True, "killed": bool(killed)}
-
     # --- операции -------------------------------------------------------
 
     def _require(self) -> Cdp:
@@ -236,6 +262,37 @@ class LiveBrowser:
           text: (hit.textContent || '').trim().slice(0, 90), href: (hit.href || '').slice(0, 140)};
 })()
 """
+
+    PICK_VIDEO_JS = """
+(() => {
+  const links = Array.from(document.querySelectorAll(
+      "ytd-video-renderer a#thumbnail[href*='/watch'], ytd-video-renderer a#video-title[href*='/watch'], a[href*='/watch?v=']"));
+  const good = links.filter(a => !(a.textContent || '').includes('Текущее видео'));
+  if (!good.length) return {ok: false, reason: 'нет ссылок-видео в выдаче'};
+  const pick = good[0];
+  pick.scrollIntoView({block: 'center'});
+  pick.click();
+  return {ok: true, href: pick.href, text: (pick.textContent || '').trim().slice(0, 80)};
+})()
+"""
+
+    def open_first_video(self, wait_timeout_s: float = 20.0) -> dict:
+        """Открыть первое видео из выдачи: DOM-клик, а если страница не сменилась —
+        прямой переход по собранному href (протокол надёжнее «поймать» вёрстку)."""
+        picked = self.evaluate(self.PICK_VIDEO_JS)
+        if not (picked or {}).get("ok"):
+            return {"ok": False, "reason": (picked or {}).get("reason", "выбор не сработал")}
+        href = picked.get("href", "")
+        on_watch = self.wait_for("location.pathname.startsWith('/watch')", 6.0)
+        how = "click"
+        if not on_watch and href:
+            navigation = self.navigate(href)
+            on_watch = bool(navigation.get("loaded"))
+            how = "navigate-fallback"
+        picked.update({"ok": bool(on_watch), "how": how})
+        if not on_watch:
+            picked["reason"] = "страница видео не открылась"
+        return picked
 
     def click_text(self, text: str) -> dict:
         """DOM-клик по элементу с заданным текстом (не координатный «слепой» клик)."""

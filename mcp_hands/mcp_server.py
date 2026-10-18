@@ -1018,7 +1018,13 @@ def live_browser(action: str = "start", profile: str = "work",
                 outcome = browser.connect_user()
             else:
                 outcome = {**browser.start_work(headless=headless), "ok": True}
-                browser.ensure_tab()
+                try:
+                    browser.ensure_tab()
+                except Exception:
+                    # не оставляем осиротевший экземпляр: если подключение к вкладке
+                    # не удалось, наш процесс всё равно закрывается
+                    browser.stop()
+                    raise
         elif action == "connect_user":
             outcome = browser.connect_user()
         elif action == "stop":
@@ -1151,11 +1157,12 @@ def live_youtube(query: str, fullscreen: bool = True,
                       "ok": found.get("ok")})
         if not found.get("ok"):
             return _fail("live_youtube", started, f"выдача пуста: {found.get('reason')}")
-        clicked = browser.click_text((found["top"][0]["text"] or "")[:40])
-        steps.append({"step": "click", "ok": clicked.get("ok"),
-                      "text": clicked.get("text", "")[:80]})
+        clicked = browser.open_first_video()
+        steps.append({"step": "open_video", "ok": clicked.get("ok"),
+                      "how": clicked.get("how"), "text": clicked.get("text", "")[:80]})
         if not clicked.get("ok"):
-            return _fail("live_youtube", started, f"клик не прошёл: {clicked.get('reason')}")
+            return _fail("live_youtube", started,
+                         f"видео не открылось: {clicked.get('reason')}")
         appeared = browser.wait_for("!!document.querySelector('video')", 25.0)
         steps.append({"step": "video_appeared", "ok": appeared})
         if not appeared:
