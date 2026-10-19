@@ -56,12 +56,39 @@ osu!-агента (план: `D:\BOT\OSU\osu_plan.md`). Проект не зак
 ```powershell
 cd D:\BOT\MCP-Hands
 py -3 -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt   # нужен интернет
-.venv\Scripts\python.exe -m pytest -q                          # ожидаем 248 passed
+.venv\Scripts\python.exe -m pip install -r requirements.lock.txt   # 89 пакетов, нужен интернет
+.venv\Scripts\python.exe -m pytest -q                                # ожидаем 248 passed
 ```
+
+**Проверено 19.10.2026:** восстановление из слепка выполнено, сьют прогнан — **248 passed**
+(2 минуты 8 секунд), живой smoke слоя: `health`, `windows_list` (7 окон), `observe` — всё
+отвечает, канон 38 инструментов синхронен с диспетчером.
+
+**Нюанс слепка:** `requirements.lock.txt` содержит `torch==2.14.1+cu126` и
+`torchvision==0.29.1+cu126` — это опциональный VLM-путь спайка (этап 0). Такие колёса живут
+только на индексе PyTorch, и `pip` из PyPI не разрешает их вовсе — поэтому в слепке строки
+закомментированы с подсказкой:
+
+```powershell
+.venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+```
+
+Без них сьют проходит полностью (VLM-тесты опциональны).
 
 Живой слой: запустить `tools\opera_debug_launcher.py` для работы в сессии владельца.
 Ассистент: `jarvis_panel.bat` (модели Piper при необходимости скачать заново).
+
+## Публикация (подготовлено 19.10.2026)
+
+Витрина собрана: `README.md` (EN) + `README.ru.md` (RU) в едином стиле с репозиториями автора
+(центрированная шапка, порядок бейджей, разделы `---`), `LICENSE` (AGPL-3.0, dual по запросу),
+`config.example.json`, `docs/CONNECT.md`, демо-скриншот живого прогона `docs/demo-live.png`
+(обрезан от личных данных). Гигиена проверена: секретов в истории нет (единственное вхождение
+`rv__` — тестовая заглушка `rv__SECRET` в `tests/test_assistant_voice.py`), автор один и
+noreply, служебные папки не версионируются (165 файлов).
+
+**Осталось за владельцем:** переключить репозиторий в Public в настройках GitHub и заполнить
+About/Topics (тексты предложены). После переключения — проверка отрендеренной страницы.
 
 ## Контур аудита
 

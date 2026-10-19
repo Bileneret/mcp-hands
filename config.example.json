@@ -1,0 +1,24 @@
+{
+ "_comment": "Пример локального конфига. Скопируйте в config.local.json рядом с проектом и заполните своими значениями. config.local.json в репозиторий не попадает (.gitignore) — ключ в git не хранится никогда.",
+ "llm": {
+  "base_url": "https://your-provider.example/v1",
+  "api_key": "PASTE-YOUR-KEY-HERE",
+  "model": "your-model-name",
+  "temperature": 0.2,
+  "max_tokens": 2048,
+  "plan_attempts": 3
+ },
+ "assistant": {
+  "_comment": "Настройки голосового ассистента. Их проще задать через панель tools/jarvis_panel.py — она пишет эту секцию сама, не трогая llm.",
+  "tts": {
+   "provider": "windows",
+   "voice": "Microsoft Irina",
+   "rate": "+0%",
+   "pitch": "+0Hz"
+  },
+  "mic": {
+   "device": ""
+  },
+  "sleep_after_s": 60
+ }
+}
