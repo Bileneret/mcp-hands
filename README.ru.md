@@ -6,8 +6,17 @@
 [![Лицензия: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 ![Платформа](https://img.shields.io/badge/Platform-Windows_10%2F11-lightgrey.svg)
 [![Инструменты](https://img.shields.io/badge/MCP-%D0%B8%D0%BD%D1%81%D1%82%D1%80%D1%83%D0%BC%D0%B5%D0%BD%D1%82%D0%BE%D0%B2_38-brightgreen.svg)](#что-это)
+[![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://vshymanskyy.github.io/StandWithUkraine/)
+
+<a href="https://vshymanskyy.github.io/StandWithUkraine/">
+  <img src="https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg" width="450" alt="Stand With Ukraine">
+</a>
+
+---
 
 [English version](README.md)
+
+---
 
 > Локальный исполнительный слой для computer-use агентов на Windows: 38 MCP-инструментов с
 > вводом под стражами, настоящим зрением и живым браузером по протоколу — плюс локальный
