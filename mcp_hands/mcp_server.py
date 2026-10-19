@@ -1325,11 +1325,16 @@ def live_browser(action: str = "start", profile: str = "work",
     ok = bool(outcome.get("ok", True))
     mode = outcome.get("mode") or (profile if action == "start" else "")
     page = outcome.get("title") or outcome.get("url") or outcome.get("note", "")
+    summary = f"живой браузер: {action}" + (f" ({mode})" if mode else "")
+    if ok:
+        summary += f" — {page[:70]}" if page else ""
+    else:
+        # Отказ ОБЯЗАН быть виден в сводке: замер 19.10 показал, как агент, читающий
+        # только сводку, принял неудавшееся подключение за успешное («connect_user» без
+        # причины) — и продолжил работать с пустой сессией.
+        summary += f" — НЕ ВЫШЛО: {(outcome.get('reason') or 'причина не сообщена')[:70]}"
     result = ToolResult(ok=ok, refused=False, reason=outcome.get("reason", ""),
-                        summary=f"живой браузер: {action}"
-                                + (f" ({mode})" if mode else "")
-                                + (f" — {page[:70]}" if page else ""),
-                        detail=outcome)
+                        summary=summary, detail=outcome)
     _journal("live_browser", started, result, {"action": action, "profile": profile})
     return result
 
