@@ -60,3 +60,6 @@ pydantic==2.14.1
 
 # ВНИМАНИЕ: av==19.0.1 установлен транзитивно, но несовместим с faster-whisper 1.2.1
 # (metadata_errors). WAV читаем сами (wave + numpy) — см. mcp_hands/assistant/voice.py.
+# Внешние зависимости, найденные аудитом v32 при сверке импортов (не хватало pypdf)
+anyio==4.15.1
+pypdf==6.21.0

@@ -54,7 +54,7 @@ real user sessions:*
 | Agent vs human, 9 matched tasks | **48.0 s vs 1028 s → ×21.4** (per task ×8.5 … ×212.1) | `docs/HUMAN_BASELINE.md` |
 | Live missions on the owner's machine | **10 run, 7 achieved**, 3 open with named reasons | `docs/MISSIONS_RUN.md` |
 | Repeated goal solved by recipe | **1.3–6.8 s, 0 model tokens** | `docs/COMPARE_HANDS_VS_IAB.md` |
-| Test suite | **248 passed** | `pytest -q` |
+| Test suite | **248 tests**: **248 passed** on a live desktop; a limited (headless) session skips the live ones — e.g. **221 passed + 27 skipped** | `pytest -q` |
 | UIA element search | median **9.8 ms**; cached properties **0.055 ms/element** vs 1.7–2.6 ms live | `spike/RESULTS.md` |
 | Screen capture | DXGI frame copy **1.42 ms** (p95 1.79) vs BitBlt **33.0 ms**; window crop 0.54 ms | `spike/RESULTS.md` |
 | Window-event delivery | **≤0.5 ms** to the hook thread | `spike/RESULTS.md` |
@@ -239,7 +239,9 @@ sleep.
   session, and building a Word note from open tabs) — listed with reasons in
   `docs/MISSIONS_RUN.md`. No retries were dressed up as successes.
 - **No CI.** There is no workflow in this repository, so there is no CI badge; the test suite
-  is meant to run on a live Windows desktop, where the live subset can actually work.
+  is meant to run on a live Windows desktop, where the live subset can actually work. In a
+  headless session those tests are skipped rather than failed — the honest shape is
+  "221 passed + 27 skipped" out of 248, and the README's metrics row says exactly that.
 - **Windows-only by design.** The whole point is Win32/UIA/COM/CDP behaviour on a real machine.
 - **OCR is a hint, not truth** (see highlights), and 60-Hz screenshots are not a timing source
   for anything that needs millisecond precision.

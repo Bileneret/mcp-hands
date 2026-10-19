@@ -25,7 +25,7 @@ ZCode (`~/.zcode/…`) или Claude Desktop (`%APPDATA%\Claude\claude_desktop_c
 {
   "mcpServers": {
     "mcp-hands": {
-      "command": "D:\BOT\MCP-Hands\.venv\Scripts\python.exe",
+      "command": "D:/BOT/MCP-Hands/.venv/Scripts/python.exe",
       "args": ["-m", "mcp_hands.mcp_server"]
     }
   }

@@ -7,13 +7,17 @@
 
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
 import numpy as np
 
 SAMPLE_RATE = 16000
-MODEL_DIR = Path(r"D:\hf-cache\faster_whisper")
+#: Кэш модели Whisper: путь можно переопределить переменной окружения. Раньше здесь был
+#: жёстко зашит каталог с диска автора — на другой машине модуль падал (замечание аудита v32).
+MODEL_DIR = Path(os.environ.get("MCP_HANDS_WHISPER_DIR")
+                 or Path.home() / ".cache" / "faster_whisper")
 
 _model = None  # ленивая загрузка и повторное использование
 
