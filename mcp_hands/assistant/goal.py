@@ -164,6 +164,7 @@ class GoalRunner:
         self.planner = planner        # инъекция для тестов: (config, ...) -> PlanRequestResult
         self.executor = executor      # инъекция для тестов: (plan, ...) -> PlanRun
         self.limits = limits or DEFAULT_LIMITS
+        self.last_plan_tokens = 0  # расход планировщика последнего плана
         self.trace: list[dict] = []
 
     def _log(self, kind: str, **fields) -> None:
@@ -210,9 +211,13 @@ class GoalRunner:
         note = self._facts_note(facts)
         request = self.planner(self.config, task_id=f"goal-{abs(hash(goal)) % 100000}",
                                title=goal, needs=[], note=note)
+        tokens = sum(int(item.get("prompt_tokens", 0)) + int(item.get("completion_tokens", 0))
+                     for item in getattr(request, "attempts", []) or [])
+        self.last_plan_tokens = tokens  # расход планировщика — в отчёт миссий
         if request.plan is None:
-            self._log("plan_failed", goal=goal[:120], error=request.error[:200])
+            self._log("plan_failed", goal=goal[:120], error=request.error[:200], tokens=tokens)
             return None, request.error or "модель не вернула план"
+        self._log("plan", goal=goal[:120], steps=len(request.plan.steps), tokens=tokens)
         return request.plan, "llm"
 
     @staticmethod
@@ -256,13 +261,15 @@ class GoalRunner:
                                     plan_source=source)
             summary = outcome.summary()
             self._log("run", goal=goal[:120], source=source, ok=summary.get("ok"),
-                      steps=len(plan.steps), seconds=round(time.perf_counter() - started, 1))
+                      steps=len(plan.steps), seconds=round(time.perf_counter() - started, 1),
+                      tokens=self.last_plan_tokens)
             if summary.get("ok"):
                 self.recipes.save(goal, plan, self.fingerprint(facts["facts"]))
-                return {"say": self._say_ok(summary), "ok": True,
+                active = str(((facts["facts"].get("active") or {}).get("title")) or "")
+                return {"say": self._say_ok(summary, active_title=active), "ok": True,
                         "detail": {"source": source, "steps": len(plan.steps),
                                    "seconds": round(time.perf_counter() - started, 1),
-                                   "summary": summary}}
+                                   "tokens": self.last_plan_tokens, "summary": summary}}
             if attempt > retries:
                 if source == "recipe":
                     self.recipes.drop(goal)  # рецепт устарел: мир изменился
@@ -276,15 +283,26 @@ class GoalRunner:
                         "detail": {"source": "none", "summary": summary}}
             plan = replanned
 
+    #: Цели-наблюдения: их отчёт обязан называть окно, иначе «что на экране?»
+    #: не отвечает на свой вопрос (нашёл живой прогон миссии 1).
+    OBSERVING_ACTIONS = frozenset({"observe", "ocr_window", "ocr_find", "windows_list"})
+
     @staticmethod
-    def _say_ok(summary: dict) -> str:
-        """Отчёт по факту: сколько шагов и какое постусловие подтвердилось."""
+    def _say_ok(summary: dict, active_title: str = "") -> str:
+        """Отчёт по факту: окно (для наблюдений), сколько шагов и что подтвердилось."""
         steps = summary.get("steps") or []
         done = [step for step in steps if step.get("ok")]
         last = steps[-1] if steps else {}
         fact = EXPECT_SAY.get(str(last.get("expect", "")), "")
+        content = speakable(str(last.get("summary", "") or ""), limit=120)
+        head = ""
+        if active_title and str(last.get("action", "")) in GoalRunner.OBSERVING_ACTIONS:
+            head = f"Активное окно: {speakable(active_title, limit=60)}. "
         base = f"Готово: шагов {len(done)} из {len(steps)}"
-        return speakable(f"{base}, {fact}." if fact else f"{base}.")
+        if content:
+            return speakable(f"{head}{base}, {fact}. {content}" if fact
+                             else f"{head}{base}. {content}")
+        return speakable(f"{head}{base}, {fact}." if fact else f"{head}{base}.")
 
     @staticmethod
     def _say_fail(summary: dict) -> str:

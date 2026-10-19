@@ -132,6 +132,7 @@ class StepOutcome:
     expect_kind: str = ""
     expect_ok: bool = False
     evidence: str = ""
+    summary: str = ""  # что инструмент сказал о результате (для отчёта цели)
     disputed: bool = False  # L1 и L2 разошлись (этап 4)
     rolled_back: bool = False  # файлы восстановлены из чекпойнта (этап 4)
     human_required: bool = False  # причина класса «нужен человек» (этап 4, метрика)
@@ -155,7 +156,7 @@ class PlanRun:
                            "attempts": s.attempts, "expect": s.expect_kind,
                            "expect_ok": s.expect_ok, "ignored_args": s.ignored_args,
                            "disputed": s.disputed, "rolled_back": s.rolled_back,
-                           "reason": s.reason} for s in self.steps],
+                           "summary": s.summary, "reason": s.reason} for s in self.steps],
                 "total_ms": round(self.total_ms, 1), "replans": self.replans,
                 "cumulative_tokens": self.cumulative_tokens}
 
@@ -426,7 +427,9 @@ def run_plan(plan: Plan, limits: RunnerLimits | None = None,
                                                outcome.reason)
                     break  # отказ стража повторами не лечится — это не случайный сбой
                 continue  # временный сбой: повтор по бюджету
-            # действие вернуло ok: проверяем объявленную постусловие
+            # действие вернуло ok: сохраняем его сводку и проверяем постусловие
+            if isinstance(result, ToolResult) and result.summary:
+                outcome.summary = str(result.summary)[:200]
             expect_ok, evidence = _check_expect(step.expect.kind, step.expect.params)
             if step.expect.kind == "scenario_passed":
                 expect_ok = expect_ok and bool(result.ok) and result.summary.endswith("1/1")
