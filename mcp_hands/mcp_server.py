@@ -48,7 +48,7 @@ TOOL_NAMES = frozenset({
     "browser_tabs_audit", "browser_collect_sources",
     "browser_extract_text", "word_docx_to_pdf", "browser_video_capture",
     "live_browser", "live_navigate", "live_page", "live_search", "live_tabs",
-    "live_pick_video",
+    "live_pick_video", "live_type_text",
     "live_click_text", "live_video", "live_screenshot", "live_youtube",
     "click_text_on_screen", "scroll"})
 
@@ -1286,9 +1286,9 @@ def live_browser(action: str = "start", profile: str = "work",
                  title_substring: str = "") -> ToolResult:
     """Живой браузер (Opera GX) под CDP: start (свой профиль) / connect_user
     (ЖИВАЯ Opera владельца с отладочным портом — запускается его лончером;
-    наш сервер её не перезапускает и не закрывает) / attach_tab (работать в
-    указанной вкладке владельца — решение владельца 19.10; ничего не закрываем
-    и не переставляем) / stop / status.
+    наш сервер её не перезапускает и не закрывает) / new_tab (открыть СВОЮ новую
+    вкладку) / attach_tab (работать в указанной вкладке владельца — решение
+    владельца 19.10; ничего не закрываем и не переставляем) / stop / status.
 
     Управление протоколом: навигация, поиск, DOM-клики, видео, полный экран,
     скриншот. Браузер владельца без отладочного порта не трогается вовсе.
@@ -1312,6 +1312,8 @@ def live_browser(action: str = "start", profile: str = "work",
             outcome = browser.connect_user()
         elif action == "attach_tab":
             outcome = browser.attach_tab(tab, title_substring=title_substring)
+        elif action == "new_tab":
+            outcome = browser.new_tab()
         elif action == "stop":
             outcome = {**browser.stop(), "ok": True}
         elif action == "status":
@@ -1542,6 +1544,35 @@ def live_pick_video(title_contains: str = "", channel_contains: str = "") -> Too
                         detail=outcome)
     _journal("live_pick_video", started, result,
              {"title": title_contains, "channel": channel_contains})
+    return result
+
+
+@server.tool(structured_output=True)
+def live_type_text(text: str, selector: str = "") -> ToolResult:
+    """Набрать текст в поле живой страницы БЕЗ отправки (Enter не нажимается вовсе).
+
+    Отправка запрещена политикой проекта, поэтому здесь её физически нет: текст
+    вставляется протоколом в сфокусированное поле, а затем содержимое ПЕРЕЧИТЫВАЕТСЯ —
+    вердикт «набрано» ставится по факту прочитанного, а не по факту вызова.
+    `selector` — CSS-селектор поля (например, поле ввода сообщения в Telegram).
+    """
+    started = time.perf_counter()
+    browser = _live()
+    if not browser.mode:
+        return _fail("live_type_text", started,
+                     "живой браузер не подключён: live_browser start/connect_user", True)
+    if not text:
+        return _fail("live_type_text", started, "пустой текст", True)
+    try:
+        outcome = browser.type_into_focused(text, selector=selector)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_type_text", started, f"{type(exc).__name__}: {exc}")
+    result = ToolResult(ok=bool(outcome.get("ok")), refused=False,
+                        reason="" if outcome.get("ok") else "текст не подтверждён в поле",
+                        summary=(f"набрано без отправки ({outcome.get('how')}): "
+                                 f"{(outcome.get('field_text') or '')[:60]!r}"),
+                        detail=outcome)
+    _journal("live_type_text", started, result, {"chars": len(text), "selector": selector})
     return result
 
 

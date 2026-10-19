@@ -143,6 +143,43 @@ class LiveBrowser:
         return {"tabs_count": len(rows), "active_tab_title": ours.get("title", ""),
                 "active_tab_url": ours.get("url", "")}
 
+    def new_tab(self, url: str = "about:blank") -> dict:
+        """Открывает СВОЮ новую вкладку и делает её рабочей (чужих не касается)."""
+        cdp = self._cdp()
+        tab = self._open_page(url)
+        self.tab = tab
+        self._connect_tab(tab)
+        self._call("Page.enable")
+        loaded = self.wait_for("document.readyState === 'complete'", 15.0)
+        return {"ok": True, "tab": str(tab.get("id", ""))[:12],
+                "url": self.evaluate("location.href"), "loaded": loaded}
+
+    def type_into_focused(self, text: str, selector: str = "") -> dict:
+        """Набирает текст в сфокусированное поле БЕЗ нажатия Enter.
+
+        Отправка запрещена на уровне инструмента: Enter здесь не нажимается вовсе,
+        текст вставляется протоколом (`Input.insertText` — атомарно, как вставка).
+        После вставки содержимое поля перечитывается: если поле пустое, пробуем
+        DOM-вставку через `execCommand` и проверяем снова — вердикт по факту.
+        """
+        if selector:
+            self.evaluate(f"document.querySelector({selector!r})?.focus()")
+        self._call("Input.insertText", text=text)
+        read_back = self.evaluate(
+            "(() => { const el = document.activeElement;"
+            "  return el ? (el.value !== undefined ? el.value : (el.textContent || '')) : ''; })()")
+        how = "insertText"
+        if text.strip() and text.strip() not in str(read_back or ""):
+            self.evaluate("(() => { const el = document.activeElement; if (!el) return false;"
+                          f"  document.execCommand('insertText', false, {' '*0}{text!r});"
+                          "  return true; })()")
+            read_back = self.evaluate(
+                "(() => { const el = document.activeElement;"
+                "  return el ? (el.value !== undefined ? el.value : (el.textContent || '')) : ''; })()")
+            how = "execCommand"
+        return {"ok": text.strip() in str(read_back or ""), "how": how,
+                "typed": text, "field_text": str(read_back or "")[:200]}
+
     def attach_tab(self, tab_id: str = "", title_substring: str = "") -> dict:
         """Работаем в УКАЗАННОЙ вкладке владельца: не закрываем, не переставляем, не навигируем.
 

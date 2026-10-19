@@ -238,3 +238,52 @@ def test_work_profile_tab_policy(tmp_path):
     finally:
         stopped = browser.stop()
         assert stopped.get("stopped") is True, stopped
+
+def test_live_type_text_refuses_without_session_and_empty():
+    """Набор без отправки: без живой сессии и без текста — честный отказ."""
+    from mcp_hands import mcp_server as ms
+
+    blank = ms.live_browser(action="stop")
+    assert blank.ok in (True, False)  # состояние не важно: важно, что сессии нет
+    result = ms.live_type_text("Тестовое сообщение")
+    assert result.ok is False and result.refused is True
+    assert "live_browser" in result.reason
+
+
+def test_new_tab_action_is_available_and_refuses_without_session():
+    """Действие «новая вкладка» есть в live_browser и без сессии отказывает честно."""
+    from mcp_hands import mcp_server as ms
+
+    result = ms.live_browser(action="new_tab")
+    assert result.ok is False
+    assert "start/connect" in (result.reason or "") or "не подключ" in (result.reason or "")
+
+
+def test_protocol_typing_never_presses_enter(tmp_path):
+    """`type_into_focused` вставляет текст и НЕ нажимает Enter — проверяем по вызовам CDP."""
+    from mcp_hands.live import LiveBrowser
+
+    browser = LiveBrowser()
+    calls: list[tuple[str, dict]] = []
+
+    class FakeCdp:
+        def call(self, method: str, **params) -> dict:
+            calls.append((method, params))
+            if method == "Runtime.evaluate":
+                expression = str(params.get("expression", ""))
+                if "activeElement" in expression:
+                    return {"result": {"value": "Тестовое сообщение"}}
+                return {"result": {"value": True}}
+            return {"result": {}}
+
+    browser.cdp = FakeCdp()
+    browser.mode, browser.port = "user", 9222
+    browser.tab = {"id": "tab-1"}
+    outcome = browser.type_into_focused("Тестовое сообщение")
+    assert outcome["ok"] is True and outcome["how"] == "insertText"
+    assert ("Input.insertText", {"text": "Тестовое сообщение"}) in calls
+    keys = [method for method, _ in calls]
+    assert "Input.dispatchKeyEvent" not in keys, "нажатий клавиш быть не должно"
+    # в отправляемых данных нет переводов строки: Enter не нажимается даже косвенно
+    assert all(chr(10) not in str(params.get("text", "")) for _, params in calls)
+    assert all(not str(params.get("text", "")).endswith(chr(13)) for _, params in calls)
