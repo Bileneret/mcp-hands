@@ -63,3 +63,6 @@ pydantic==2.14.1
 # Внешние зависимости, найденные аудитом v32 при сверке импортов (не хватало pypdf)
 anyio==4.15.1
 pypdf==6.21.0
+
+# Путь к кэшу модели Whisper можно переопределить переменной окружения
+# MCP_HANDS_WHISPER_DIR (по умолчанию ~/.cache/faster_whisper), см. mcp_hands/assistant/voice.py
