@@ -17,7 +17,7 @@ import json
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 from ..mcp_server import TOOL_NAMES
@@ -111,7 +111,7 @@ SYSTEM_PROMPT_TEMPLATE = """Ты — планировщик компьютерн
 Ты строишь ПЛАН задачи из заранее заданных шагов; исполнение делают локальные
 инструменты. Ты НЕ посылаешь клавиши и не придумываешь инструменты.
 
-Доступные действия (строго этот список):
+Доступные действия (строго этот список; «=?» — необязательный аргумент):
 {actions}
 
 Доступные виды постусловий (expect):
@@ -126,6 +126,18 @@ SYSTEM_PROMPT_TEMPLATE = """Ты — планировщик компьютерн
 - максимум 64 шага; каждый шаг обязан иметь expect (замкнутый цикл);
 - домены "notepad_run", "word_pdf_run", "browser_links_run" закрывают свои
   задачи целиком и проверяются "scenario_passed" — не раскладывай их на мелочи;
+- типовые связки (соблюдай их, а не изобретай заново):
+  заметка из открытой страницы → live_page (узнать адрес), затем
+  browser_extract_text(url=…) — путь документа можно не указывать: он ляжет
+  в logs/documents; постусловие — file_exists(path=…, newest=true), потому что имя
+  документа выбирает инструмент;
+  browser_collect_sources — ТОЛЬКО для страницы-стенда со списком источников
+  (карточки article.source), на обычных сайтах он бесполезен;
+  разбор папки по типам → fs_sort_by_type(source=…, target_root=…);
+  видео по запросу → live_youtube(query=…) с expect video_playing;
+  «открой сайт» → live_navigate с expect page_matches;
+- у каждого шага expect обязан относиться к ЕГО действию: не ставь page_matches
+  на live_tabs (живой прогон миссии 9: план развалился именно на этом);
 - для живой Opera (плитки, страницы, видео) используй live_* вместе с
   "page_matches"/"video_playing"/"fullscreen"; если браузер без отладочного порта,
   работай глазами и руками: ocr_find по тексту, window_activate с expect
@@ -170,6 +182,41 @@ _EXPECT_HINTS = {
 }
 
 
+_TOOL_CATALOG: str = ""
+
+
+def tool_catalog() -> str:
+    """Каталог инструментов с аргументами: имя(арг, арг=…) — первая строка докстринга.
+
+    Планировщик получал только ИМЕНА и угадывал параметры: в живом прогоне миссии 10
+    план вызвал fs_sort_by_type без обязательных source/target_root и шаг отказал.
+    Сигнатуры берём из самих функций mcp_server — единый источник истины.
+    """
+    global _TOOL_CATALOG
+    if _TOOL_CATALOG:
+        return _TOOL_CATALOG
+    import inspect
+
+    from .. import mcp_server
+
+    lines: list[str] = []
+    for name in sorted(TOOL_NAMES):
+        function = getattr(mcp_server, name, None)
+        doc = (getattr(function, "__doc__", "") or "").strip().splitlines()
+        first = doc[0][:90] if doc else ""
+        try:
+            signature = inspect.signature(function)
+            arguments = ", ".join(
+                parameter.name + ("" if parameter.default is inspect.Parameter.empty else "=?")
+                for parameter in signature.parameters.values()
+                if parameter.kind not in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD))
+        except (TypeError, ValueError):
+            arguments = ""
+        lines.append(f"- {name}({arguments}) — {first}")
+    _TOOL_CATALOG = "\n".join(lines)
+    return _TOOL_CATALOG
+
+
 def expect_kinds_help() -> str:
     """Список постусловий для промпта планировщика (единый источник — plan.py)."""
     return "\n".join(f"- {kind}: {_EXPECT_HINTS.get(kind, '')}"
@@ -178,7 +225,7 @@ def expect_kinds_help() -> str:
 
 def build_plan_messages(task_id: str, title: str, needs: list[str], note: str = "") -> list[dict]:
     """Собирает [system, user] для запроса плана; действия — из канона сервера."""
-    system = SYSTEM_PROMPT_TEMPLATE.format(actions=", ".join(sorted(TOOL_NAMES)),
+    system = SYSTEM_PROMPT_TEMPLATE.format(actions=tool_catalog(),
                                            expect_kinds=expect_kinds_help())
     user = USER_PROMPT_TEMPLATE.format(task_id=task_id, title=title,
                                        needs=", ".join(needs) or "—", note=note or "—")
@@ -192,23 +239,61 @@ class PlanRequestResult:
     error: str = ""
 
 
+#: Бюджет ответа для повторной попытки планирования. Причина: «рассуждающие» модели
+#: (GLM-5.3-Flash и подобные) тратят ВЕСЬ max_tokens на reasoning_content и отдают
+#: пустой content с finish_reason=length — живой прогон миссии 9 показал ровно это
+#: (2048 токенов рассуждений, контент пустой).
+PLAN_RETRY_MAX_TOKENS = 6144
+
+
+def _reasoning_used(response: LLMResponse) -> int:
+    """Сколько токенов ушло на рассуждения: нужно для честного объяснения пустого ответа."""
+    choice = ((response.raw or {}).get("choices") or [{}])[0]
+    details = (((response.raw or {}).get("usage") or {}).get("completion_tokens_details") or {})
+    return int(details.get("reasoning_tokens") or 0) or int(
+        bool(str((choice.get("message") or {}).get("reasoning_content") or "")))
+
+
+#: Тайм-аут планирования: «рассуждающие» модели с большим бюджетом пишут дольше, и
+#: 60 секунд по умолчанию не хватало (живой прогон миссии 9: TimeoutError при бюджете 6144).
+PLAN_TIMEOUT_S = 150.0
+
+
 def request_plan(config: LLMConfig, task_id: str, title: str, needs: list[str],
-                 note: str = "") -> PlanRequestResult:
+                 note: str = "", retry_max_tokens: int = PLAN_RETRY_MAX_TOKENS,
+                 timeout_s: float = PLAN_TIMEOUT_S) -> PlanRequestResult:
     """Запрашивает план у модели и валидирует схемой; невалидные попытки
-    возвращаются модели на исправление (до plan_attempts), история — в attempts."""
+    возвращаются модели на исправление (до plan_attempts), история — в attempts.
+
+    Пустой ответ (рассуждения съели бюджет) — отдельный случай: для него поднимаем
+    бюджет второй попытки и прямо просим вернуть JSON без рассуждений.
+    """
     result = PlanRequestResult(plan=None)
     messages = build_plan_messages(task_id, title, needs, note)
     last_error = ""
     for attempt in range(1, max(1, config.plan_attempts) + 1):
+        budget = config.max_tokens if attempt == 1 else max(config.max_tokens, retry_max_tokens)
+        attempt_config = config if budget == config.max_tokens else replace(config, max_tokens=budget)
         try:
-            response = _post_chat(config, messages)
+            response = _post_chat(attempt_config, messages, timeout_s=timeout_s)
         except LLMError as exc:
             last_error = str(exc)
             result.attempts.append({"attempt": attempt, "transport_error": last_error})
             continue
-        raw = {"attempt": attempt, "ms": response.ms,
+        raw = {"attempt": attempt, "ms": response.ms, "max_tokens": budget,
                "prompt_tokens": response.prompt_tokens,
                "completion_tokens": response.completion_tokens}
+        if not (response.text or "").strip():
+            reasoning = _reasoning_used(response)
+            raw["verdict"] = (f"пустой ответ: {reasoning} токенов на рассуждения, "
+                              f"бюджет {budget} исчерпан до JSON")
+            messages.append({"role": "assistant", "content": ""})
+            messages.append({"role": "user", "content":
+                             "Ответ пуст: рассуждения израсходовали бюджет. Верни СРАЗУ "
+                             "JSON-план без пояснений и рассуждений."})
+            result.attempts.append(raw)
+            last_error = raw["verdict"]
+            continue
         messages.append({"role": "assistant", "content": response.text})
         try:
             plan = parse_plan(response.text)

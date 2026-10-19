@@ -196,7 +196,7 @@ class GoalRunner:
         return {"exe": str(active.get("exe", ""))[:40],
                 "browser": str(browser.get("mode", ""))}
 
-    def make_plan(self, goal: str, facts: dict) -> tuple[Plan | None, str]:
+    def make_plan(self, goal: str, facts: dict, hint: str = "") -> tuple[Plan | None, str]:
         """План под цель: сначала рецепт (если обстановка совпала), затем модель."""
         current = self.fingerprint(facts)
         known = self.recipes.get(goal)
@@ -209,6 +209,10 @@ class GoalRunner:
                 return plan, "recipe"
             self._log("recipe_skip", goal=goal[:120], was=stamp, now=current)
         note = self._facts_note(facts)
+        if hint:
+            # Подсказка миссии (её собственное описание: что нужно для прогона) —
+            # часть постановки задачи, а не секрет от планировщика.
+            note = f"задача миссии: {hint}. {note}"
         request = self.planner(self.config, task_id=f"goal-{abs(hash(goal)) % 100000}",
                                title=goal, needs=[], note=note)
         tokens = sum(int(item.get("prompt_tokens", 0)) + int(item.get("completion_tokens", 0))
@@ -242,11 +246,11 @@ class GoalRunner:
 
     # --- исполнение ---------------------------------------------------------
 
-    def run(self, goal: str, planner_retries: int = 1) -> dict:
+    def run(self, goal: str, planner_retries: int = 1, hint: str = "") -> dict:
         """Выполнить цель. Возвращает {"say", "ok", "detail"} — фразу для голоса и факты."""
         started = time.perf_counter()
         facts = self.observe()
-        plan, source = self.make_plan(goal, facts["facts"])
+        plan, source = self.make_plan(goal, facts["facts"], hint=hint)
         if plan is None:
             say = f"Не смог построить план: {source[:120]}"
             return {"say": say, "ok": False, "detail": {"error": source, "source": "none"}}
@@ -277,7 +281,7 @@ class GoalRunner:
                         "detail": {"source": source, "attempts": attempt,
                                    "summary": summary}}
             self._log("replan", goal=goal[:120], reason=str(summary.get("reason", ""))[:160])
-            replanned, source = self.make_plan(goal, facts["facts"])
+            replanned, source = self.make_plan(goal, facts["facts"], hint=hint)
             if replanned is None:
                 return {"say": self._say_fail(summary), "ok": False,
                         "detail": {"source": "none", "summary": summary}}

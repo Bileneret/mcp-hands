@@ -165,6 +165,17 @@ SYSTEM_PROMPT = """Ты — Джарвис, голосовой ассистен�
 Помни историю разговора: «а теперь второй», «повтори» относятся к предыдущему."""
 
 
+#: Слова-маркеры информационного вопроса: на них отвечает старший мозг (сбор фактов и
+#: формулировка), а не план действий — разница вскрылась живым прогоном миссии 7.
+_INFORMATIONAL_MARKERS = ("ответь", "скажи", "расскажи", "что такое", "объясни",
+                          "поясни", "как работает", "почему")
+
+
+def _is_informational(text: str) -> bool:
+    lowered = text.lower()
+    return any(marker in lowered for marker in _INFORMATIONAL_MARKERS)
+
+
 class Assistant:
     """Один сеанс Джарвиса: держит живой браузер и конфиг мозга."""
 
@@ -376,7 +387,7 @@ class Assistant:
             return "Не удалось завершить за отведённые шаги."
         return (final.text or "").strip() or "Не удалось завершить за отведённые шаги."
 
-    def handle(self, text: str) -> dict:
+    def handle(self, text: str, goal_hint: str = "") -> dict:
         """Полный маршрут: локальный интент → цель → старший мозг.
 
         Локальный интент отвечает мгновенно; в режиме цели сложная фраза уходит
@@ -387,13 +398,20 @@ class Assistant:
         if local.get("handled"):
             return {"say": local["say"], "kind": "local", "detail": local.get("detail", {})}
         if self.goal_mode:
-            goal = self.run_goal(text)
+            # Информационный вопрос («что такое…», «ответь со ссылкой») требует не плана
+            # действий, а осмысленного ответа: его собирает старший мозг с инструментами
+            # (живой прогон миссии 7 показал, что плану это чуждо).
+            if _is_informational(text):
+                smart = self.run_smart(text)
+                return {"say": smart["say"], "kind": "smart",
+                        "detail": smart.get("detail", {})}
+            goal = self.run_goal(text, hint=goal_hint)
             if goal.get("ok") or goal.get("detail", {}).get("planned", True):
                 return {"say": goal["say"], "kind": "goal", "detail": goal.get("detail", {})}
         smart = self.run_smart(text)
         return {"say": smart["say"], "kind": "smart", "detail": smart.get("detail", {})}
 
-    def run_goal(self, text: str) -> dict:
+    def run_goal(self, text: str, hint: str = "") -> dict:
         """Цель целиком: разведка, план, исполнение с проверками, отчёт голосом."""
         from .goal import GoalRunner
 
@@ -408,7 +426,7 @@ class Assistant:
                 self._log("goal_memory_unavailable", error=str(exc)[:160])
             runner = GoalRunner(self.config, self.log_dir, memory=memory)
             self._goal_runner = runner
-        outcome = runner.run(text)
+        outcome = runner.run(text, hint=hint)
         self.dialogue.remember("user", text)
         self.dialogue.remember("assistant", outcome["say"], kind="goal")
         self._log("goal", text=text, ok=outcome.get("ok"),

@@ -223,8 +223,8 @@ def test_assistant_goal_mode_routes_unmatched_phrase_to_goal(tmp_path):
 
     assistant = Assistant(force_work=True, log_dir=tmp_path, goal_mode=True)
     assistant.run_local = lambda text: {"handled": False}  # type: ignore[assignment]
-    assistant.run_goal = lambda text: {"say": "Готово: шагов 3, видео играет.",  # type: ignore[assignment]
-                                       "ok": True, "detail": {"source": "llm"}}
+    assistant.run_goal = lambda text, hint="": {"say": "Готово: шагов 3, видео играет.",  # type: ignore[assignment]
+                                                "ok": True, "detail": {"source": "llm"}}
     result = assistant.handle("включи мне что-нибудь интересное")
     assert result["kind"] == "goal", result
     assert result["say"].startswith("Готово")

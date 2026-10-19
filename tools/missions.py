@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -124,6 +125,85 @@ def check_tabs_named(_result: dict) -> tuple[bool, str]:
     return True, tabs.summary[:80]
 
 
+def check_answer_with_source(result: dict) -> tuple[bool, str]:
+    """Миссия 7: в ответе есть суть И ссылка, а страница действительно открыта.
+
+    Требуем оба факта: без ссылки ответ бесполезен, без открытой страницы ссылка
+    не проверяема — это и есть «ответил по факту, а не по памяти».
+    """
+    say = str(result.get("say", ""))
+    page = ms.live_page()
+    url = str((page.detail or {}).get("url", ""))
+    # Ссылкой считаем и адрес без схемы («ru.wikipedia.org/wiki/…») — придираться к форме
+    # бессмысленно. Но источник обязан БЫТЬ ОТКРЫТ: живой прогон 7 показал ответ со ссылкой
+    # на Википедию при открытом python.org — это ответ по памяти, а не найденный в интернете.
+    cited = set(re.findall(r"([\w.-]+\.(?:ru|com|org|io|net|ua|edu|gov))", say.lower()))
+    opens = url.lower()
+    matched = sorted(domain for domain in cited if domain in opens)
+    if matched and opens.startswith("http"):
+        return True, f"источник открыт: {url[:70]}"
+    if not cited:
+        return False, f"в ответе нет ссылки: {say[:60]!r}"
+    return False, (f"в ответе ссылка на {sorted(cited)[:2]}, а открыта страница "
+                   f"{url[:60] or 'никакая'} — источник не найден")
+
+
+def check_ecampus(result: dict) -> tuple[bool, str]:
+    """Миссия 8: открыт раздел ecampus и назван факт (объявление/раздел)."""
+    say = str(result.get("say", "")).lower()
+    page = ms.live_page()
+    url = str((page.detail or {}).get("url", "")).lower()
+    on_campus = "ecampus" in url or "campus" in url
+    if on_campus and any(word in say for word in ("объявлен", "раздел", "курс", "тема", "—")):
+        return True, f"страница ecampus открыта: {url[:60]}"
+    if on_campus:
+        return False, f"страница открыта, но факта в ответе нет: {say[:60]!r}"
+    return False, f"не на ecampus: {url[:60] or page.summary[:50]} — вероятно нужен вход"
+
+
+def docx_snapshot() -> set[str]:
+    """Список существующих .docx до прогона: «появился новый» считается только по нему.
+
+    Без этого проверка ловила бы чужие файлы (следы бенчмарка и офисных тестов) и
+    выдавала ложное «достигнуто» — именно так и случилось в первом прогоне блока.
+    """
+    found: set[str] = set()
+    for root in (ROOT / "logs", ROOT / "docs"):
+        for path in root.rglob("*.docx"):
+            found.add(str(path))
+    return found
+
+
+def check_docx_created(result: dict) -> tuple[bool, str]:
+    """Миссия 9: появился НОВЫЙ .docx (которого не было до прогона) и он непустой."""
+    before = set(result.get("_docx_before") or [])
+    candidates = [(path.stat().st_mtime, Path(path)) for path in docx_snapshot() - before
+                  if Path(path).exists() and Path(path).stat().st_size > 2000]
+    if not candidates:
+        return False, "нового .docx после прогона не появилось"
+    stamp, path = max(candidates)
+    return True, f"создан {path.name} ({path.stat().st_size} байт, {path.parent.name}/)"
+
+
+def check_downloads_sorted(result: dict) -> tuple[bool, str]:
+    """Миссия 10: в папке не осталось файлов, появились подпапки по типам."""
+    import os as _os
+
+    target = str((result.get("detail") or {}).get("downloads_dir", "")) or         _os.environ.get("MCP_HANDS_MISSION_DOWNLOADS", "")
+    if not target:
+        return False, "папка не задана (MCP_HANDS_MISSION_DOWNLOADS)"
+    root = Path(target)
+    if not root.is_dir():
+        return False, f"папки {target!r} нет"
+    files = [p.name for p in root.iterdir() if p.is_file()]
+    folders = [p.name for p in root.iterdir() if p.is_dir()]
+    if files:
+        return False, f"остались файлы: {files[:5]}"
+    if not folders:
+        return False, "папок по типам не появилось"
+    return True, f"файлы разложены по папкам: {folders[:6]}"
+
+
 # --- реестр миссий -------------------------------------------------------------
 
 MISSIONS: dict[int, dict] = {
@@ -142,34 +222,53 @@ MISSIONS: dict[int, dict] = {
     6: {"phrase": "Открой Twitch и включи что-нибудь по моим интересам",
         "verify": check_video_playing, "needs": "живой браузер (Opera)", "mode": "goal"},
     7: {"phrase": "Найди в интернете, что такое MCP, и ответь коротко со ссылкой",
-        "verify": check_screen_named, "needs": "живой браузер", "mode": "goal"},
+        "verify": check_answer_with_source,
+        "needs": "живой браузер (подходит свой профиль — вход не нужен)", "mode": "goal"},
     8: {"phrase": "Открой ecampus и найди последнее объявление по программированию",
-        "verify": check_screen_named, "needs": "живой браузер", "mode": "goal"},
+        "verify": check_ecampus,
+        "needs": "живой браузер СО ВХОДАМИ владельца (свой профиль без авторизации)", "mode": "goal"},
     9: {"phrase": "Собери заметку из открытых вкладок в Word",
-        "verify": check_tabs_named, "needs": "живой браузер с открытыми вкладками", "mode": "goal"},
+        "verify": check_docx_created,
+        "needs": "живой браузер с открытыми вкладками (подходит свой профиль)",
+        "mode": "goal"},
     10: {"phrase": "Разбери загрузки по типам и скажи, что куда ушло",
-         "verify": check_screen_named, "needs": "папка загрузок (по согласию владельца)",
+         "verify": check_downloads_sorted,
+         "needs": "папка загрузок по согласию владельца (для репетиции — своя папка)",
          "mode": "goal"},
 }
 
 
-def run_mission(number: int, assistant: Assistant, quiet: bool = True) -> dict:
-    """Один прогон: фраза → маршрут ассистента → независимая проверка факта."""
+def run_mission(number: int, assistant: Assistant, quiet: bool = True,
+                phrase: str | None = None) -> dict:
+    """Один прогон: фраза → маршрут ассистента → независимая проверка факта.
+
+    `phrase` позволяет подставить конкретику (например, путь к папке для миссии 10),
+    сохраняя смысл миссии: в записи видно и реестровую формулировку, и фактическую.
+    """
     mission = MISSIONS[number]
+    spoken = phrase or mission["phrase"]
     started = time.perf_counter()
-    entry = {"mission": number, "phrase": mission["phrase"], "needs": mission["needs"],
-             "ts": time.strftime("%Y-%m-%d %H:%M:%S")}
+    entry = {"mission": number, "phrase": spoken, "registry_phrase": mission["phrase"],
+             "needs": mission["needs"], "ts": time.strftime("%Y-%m-%d %H:%M:%S")}
+    answer: dict = {}
+    entry["_docx_before"] = sorted(docx_snapshot())  # что было ДО прогона
     try:
-        answer = assistant.handle(mission["phrase"])
+        # Подсказку получает только маршрут цели: локальные интенты и ответы старшего
+        # мозга она не касается (иначе миссии-наблюдения потеряли бы свою скорость).
+        answer = assistant.handle(spoken, goal_hint=mission["needs"])
         entry["route"] = answer.get("kind", "")
         entry["say"] = str(answer.get("say", ""))[:200]
         entry["tokens"] = int((answer.get("detail") or {}).get("tokens", 0) or 0)
         entry["source"] = str((answer.get("detail") or {}).get("source", ""))
-        summary = (answer.get("detail") or {}).get("summary") or {}
-        entry["steps"] = [str(step.get("action", "")) for step in (summary.get("steps") or [])]
-        entry["actions_ok"] = sum(1 for step in (summary.get("steps") or []) if step.get("ok"))
     except Exception as exc:  # noqa: BLE001 — сбой прогона фиксируем, а не прячем
         entry.update({"route": "error", "say": f"{type(exc).__name__}: {exc}"})
+    # Действия плана достаём отдельно от маршрута и с проверкой типа: у локального
+    # ответа «summary» — строка, и падение на её разборе не должно выглядеть сбоем ответа.
+    outline = (answer.get("detail") or {}).get("summary") if isinstance(answer.get("detail"),
+                                                                       dict) else {}
+    outline = outline if isinstance(outline, dict) else {}
+    entry["steps"] = [str(step.get("action", "")) for step in (outline.get("steps") or [])]
+    entry["actions_ok"] = sum(1 for step in (outline.get("steps") or []) if step.get("ok"))
     try:
         achieved, evidence = mission["verify"](entry)
     except Exception as exc:  # noqa: BLE001 — проверка тоже может упасть

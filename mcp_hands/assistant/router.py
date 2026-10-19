@@ -121,9 +121,12 @@ def route(text: str) -> dict | None:
         return {"action": "navigate", "args": {"url": SITE_ALIASES[site]},
                 "say": f"Открываю {site}."}
 
-    # «найди …» на текущей странице
+    # «найди …» на текущей странице. Но «найди в интернете … и ответь» — это не поиск по
+    # странице, а задача со сбором и осмыслением: её отдаём старшему мозгу или цели
+    # (живой прогон миссии 7: локальный поиск перехватывал фразу и отвечал «не нашлось поля»).
+    web_hint = re.search(r"\b(в интернете|в сети|в гугле|погугли|из интернета)\b", lowered)
     match = re.search(r"\b(найди|поищи|search)\s+(.+)", lowered)
-    if match:
+    if match and not web_hint:
         query = match.group(2).strip(" .,!?")
         if query:
             return {"action": "search", "args": {"query": query},

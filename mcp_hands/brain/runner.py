@@ -242,6 +242,17 @@ def _check_expect(kind: str, params: dict) -> tuple[bool, str]:
 
         target = _Path(path)
         min_bytes = int(params.get("min_bytes", 1))
+        if params.get("newest") and target.is_dir():
+            # «документ создан, имя выбрал инструмент»: проверяем самый свежий файл
+            # в папке — так постусловие работает, когда путь задаёт не план, а инструмент.
+            candidates = sorted((item for item in target.iterdir() if item.is_file()),
+                                key=lambda item: item.stat().st_mtime, reverse=True)
+            if not candidates:
+                return False, f"в папке {path!r} нет файлов"
+            newest = candidates[0]
+            size = newest.stat().st_size
+            return size >= min_bytes, (f"свежий файл {newest.name} — {size} байт "
+                                       f"(минимум {min_bytes})")
         if not target.exists():
             return False, f"файла {path!r} нет"
         size = target.stat().st_size

@@ -81,7 +81,7 @@ def test_run_mission_records_entry_and_report(tmp_path, monkeypatch):
     monkeypatch.setattr(missions, "REPORT", report)
 
     class FakeAssistant:
-        def handle(self, text: str) -> dict:
+        def handle(self, text: str, goal_hint: str = "") -> dict:
             return {"say": "Нет, youtube на экране не вижу.", "kind": "local", "detail": {}}
 
     monkeypatch.setattr(missions.ms, "ocr_find",

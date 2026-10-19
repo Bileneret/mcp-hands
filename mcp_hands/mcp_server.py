@@ -1110,21 +1110,32 @@ def browser_collect_sources(url: str, output_csv: str) -> ToolResult:
 
 
 @server.tool(structured_output=True)
-def browser_extract_text(url: str, output_docx: str) -> ToolResult:
+def browser_extract_text(url: str, output_docx: str = "") -> ToolResult:
     """Текст статьи со страницы → документ Word с оформлением цитаты.
 
     Заголовок и ссылка оформляются абзацем-цитатой (стиль Quote), ниже — текст
     статьи. Постусловие L1: файл непустой, стиль цитаты применён (InUse);
     независимое подтверждение L2 (zipfile/XML) делает runner после шага.
+
+    `output_docx` можно не указывать — документ ляжет в `logs/documents`. Профиль
+    браузера для этой загрузки создаётся отдельным каталогом на вызов: общий профиль
+    рядом с документом ловил «Отказано в доступе», если его держал прошлый прогон
+    (живой прогон миссии 9 показал ровно это).
     """
     started = time.perf_counter()
+    import time as _time
     from pathlib import Path as _Path
 
     from .browser import extract_article
     from .office import WordSession
     from .probe import DOMAIN_OPERATION_TIMEOUT_S, ProbeProcess
 
-    profile_root = _Path(output_docx).parent / "browser_profile"
+    if not output_docx:
+        documents = _Path(__file__).resolve().parents[1] / "logs" / "documents"
+        documents.mkdir(parents=True, exist_ok=True)
+        output_docx = str(documents / _time.strftime("статья_%Y%m%d_%H%M%S.docx"))
+    profile_root = (_Path(__file__).resolve().parents[1] / "logs" / "browser_profiles"
+                    / f"run_{_time.time_ns()}")
     article = extract_article(url, profile_root=profile_root)
     if not article.get("ok"):
         return _fail("browser_extract_text", started,
