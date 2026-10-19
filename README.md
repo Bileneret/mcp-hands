@@ -6,8 +6,17 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 ![Platform](https://img.shields.io/badge/Platform-Windows_10%2F11-lightgrey.svg)
 [![Tools](https://img.shields.io/badge/MCP_tools-38-brightgreen.svg)](#what-this-is)
+[![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/badges/StandWithUkraine.svg)](https://vshymanskyy.github.io/StandWithUkraine/)
+
+<a href="https://vshymanskyy.github.io/StandWithUkraine/">
+  <img src="https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg" width="450" alt="Stand With Ukraine">
+</a>
+
+---
 
 [Русская версия](README.ru.md)
+
+---
 
 > A local Windows execution layer for computer-use agents: 38 MCP tools with guarded input,
 > real screen perception and a live-browser protocol — plus a local voice assistant that
