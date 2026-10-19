@@ -349,8 +349,17 @@ class LiveBrowser:
 
     def navigate(self, url: str, load_timeout_s: float = 25.0) -> dict:
         if self.mode == "user":
-            # В браузере ВЛАДЕЛЬЦА никогда не навигируем в его вкладках:
-            # открываем СВОЮ новую вкладку и работаем в ней — его страницы целы.
+            # В браузере ВЛАДЕЛЬЦА никогда не навигируем в его вкладках. Свою вкладку
+            # создаём один раз и дальше ходим В НЕЙ: иначе каждый шаг добавляет вкладку
+            # и браузер владельца зарастает дубликатами (живой прогон 19.10 оставил пять).
+            if self.tab and self.tab.get("id"):
+                self._require()
+                self._call("Page.navigate", url=url)
+                loaded = self.wait_for("document.readyState === 'complete'", load_timeout_s)
+                return {"url": self.evaluate("location.href"),
+                        "title": self.evaluate("document.title") or "",
+                        "ready": self.evaluate("document.readyState"), "loaded": loaded,
+                        "tab": "своя (та же)"}
             tab = self._open_page(url)
             self.tab = tab
             self._connect_tab(tab)
@@ -472,6 +481,84 @@ class LiveBrowser:
             picked["reason"] = "страница видео не открылась"
         return picked
 
+    VIDEO_LIST_JS = """
+(() => {
+  const SELECTOR = "a#video-title, a#video-title-link, ytd-video-renderer a#thumbnail[href*='/watch'], ytd-rich-item-renderer a[href*='/watch'], ytd-compact-video-renderer a[href*='/watch']";
+  const links = Array.from(document.querySelectorAll(SELECTOR));
+  const seen = new Set();
+  const items = [];
+  const looksLikeDuration = (t) => t.length <= 7 && t.indexOf(':') > 0 && !isNaN(Number(t.split(':')[0]));
+  const noise = (t) => !t || looksLikeDuration(t) || t === 'Текущее видео' || t.indexOf('Главные темы') === 0;
+  for (const link of links) {
+    const href = link.href || '';
+    if (!href || seen.has(href)) continue;
+    const holder = link.closest('ytd-video-renderer, ytd-rich-item-renderer, ytd-compact-video-renderer') || link;
+    const nameNode = holder.querySelector('ytd-channel-name a, #channel-name a, #text a');
+    let title = (link.getAttribute('title') || '').trim();
+    if (!title) {
+      const node = holder.querySelector('#video-title, #video-title-link, h3 a, h3');
+      title = (node ? (node.textContent || '') : (link.textContent || '')).trim();
+    }
+    title = title.split(' ').filter(Boolean).join(' ').slice(0, 160);
+    if (noise(title)) continue;
+    seen.add(href);
+    items.push({title: title,
+                channel: (nameNode ? (nameNode.textContent || '').trim() : '').slice(0, 80),
+                href: href.slice(0, 180)});
+  }
+  return {ok: true, items: items.slice(0, 40)};
+})()
+"""
+
+    def video_list(self) -> list[dict]:
+        """Что сейчас в выдаче: заголовки, каналы, ссылки (без кликов)."""
+        facts = self.evaluate(self.VIDEO_LIST_JS) or {}
+        return facts.get("items") or []
+
+    def pick_video(self, title_contains: str = "", channel_contains: str = "",
+                   wait_timeout_s: float = 20.0) -> dict:
+        """Открыть видео, выбранное ПО ЗАГОЛОВКУ/КАНАЛУ, а не первое в выдаче.
+
+        Именно этого не хватало владельцу: «сводка за ДЕНЬ N» — это ролик, у которого
+        в заголовке есть «ДЕНЬ», а первый результат выдачи им не является (живой прогон
+        открыл самое новое видео с разговором, а не сводку).
+        """
+        items: list[dict] = []
+        deadline = time.time() + 20.0
+        while time.time() < deadline:  # выдача YouTube грузится не мгновенно
+            items = self.video_list()
+            if items:
+                break
+            time.sleep(0.5)
+        if not items:
+            ready = self.evaluate("document.readyState") or ""
+            return {"ok": False,
+                    "reason": f"в выдаче нет ссылок-видео (readyState={ready})"}
+        title_needle = title_contains.strip().lower()
+        channel_needle = channel_contains.strip().lower()
+        match = next((item for item in items
+                      if (not title_needle or title_needle in item["title"].lower())
+                      and (not channel_needle
+                           or channel_needle in (item["channel"] or "").lower())), None)
+        if match is None:
+            top = [item["title"][:50] for item in items[:3]]
+            return {"ok": False, "reason": (f"нет видео с заголовком {title_contains!r}"
+                                            + (f" и каналом {channel_contains!r}"
+                                               if channel_contains else "")
+                                            + f"; в выдаче: {top}"),
+                    "items": items[:5]}
+        self.navigate(match["href"])
+        appeared = self.wait_for("!!document.querySelector('video')", wait_timeout_s)
+        self.video("play")
+        # Канал на странице видео появляется ПОЗЖЕ плеера: без ожидания проверка
+        # «тот ли автор» читала пустую строку и браковала правильный ролик (миссия 4).
+        self.wait_for("!!document.querySelector('ytd-channel-name a, #owner a')", 8.0)
+        status = self.video("status")
+        return {"ok": bool(appeared) and status.get("paused") is False,
+                "how": "navigate", "title": match["title"], "channel": match["channel"],
+                "href": match["href"], "playing": status.get("paused") is False,
+                "items_seen": len(items)}
+
     def click_text(self, text: str) -> dict:
         """DOM-клик по элементу с заданным текстом (не координатный «слепой» клик)."""
         return self.evaluate(self.CLICK_JS.replace("CLICK_TEXT", json.dumps(text))) or \
@@ -533,11 +620,15 @@ class LiveBrowser:
             self.wait_for("!document.fullscreenElement", 5.0)
         status = self.evaluate(
             "(() => { const v = document.querySelector('video');"
+            "  const owner = document.querySelector("
+            "    'ytd-video-owner-renderer #channel-name a, #owner #channel-name a,"
+            "     ytd-channel-name a, #upload-info a');"
             "  return {ok: true, has_video: !!v, paused: v ? v.paused : null,"
             "    current_time: v ? Math.round(v.currentTime * 10) / 10 : null,"
             "    duration: v && isFinite(v.duration) ? Math.round(v.duration) : null,"
             "    ready_state: v ? v.readyState : null,"
             "    fullscreen: !!document.fullscreenElement,"
+            "    channel: owner ? (owner.textContent || '').trim().slice(0, 80) : '',"
             "    title: document.title}; })()") or {}
         return status
 

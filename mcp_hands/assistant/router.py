@@ -79,7 +79,13 @@ def route(text: str) -> dict | None:
         query = re.split(r"\s+и\s+(включи|включить|разверни|открой|покажи)\b", query)[0].strip()
         return {"action": "youtube", "args": {"query": query, "fullscreen": True},
                 "say": f"Ищу видео: {query}, включаю на весь экран."}
-    if "новост" in lowered and any(word in lowered for word in ("включи", "покажи", "видео")):
+    # «включи свежую новостную сводку МАЙКЛА НАКИ» — это поиск конкретного ролика,
+    # а не «включи новости»: локальные правила решают только короткие команды, иначе
+    # они открывали первые попавшиеся новости вместо нужного канала (живой прогон 19.10).
+    semantic_media = any(word in lowered
+                         for word in ("видео", "ролик", "клип", "сводк", "канал"))
+    if ("новост" in lowered and any(word in lowered for word in ("включи", "покажи", "видео"))
+            and not semantic_media):
         return {"action": "youtube", "args": {"query": "новости сегодня",
                                               "fullscreen": True},
                 "say": "Включаю свежие новости на весь экран."}
@@ -116,8 +122,9 @@ def route(text: str) -> dict | None:
     # Сайт назван + команда открыть в ЛЮБОМ порядке слов: «найди на экране YouTube
     # и открой его» — живая речь не держит шаблона «открой X и найди Y».
     site = _site_in(lowered)
-    if site and re.search(r"\b(открой|открыть|запусти|включи|включить|перейди|open)\b",
-                          lowered):
+    if (site and not semantic_media
+            and re.search(r"\b(открой|открыть|запусти|включи|включить|перейди|open)\b",
+                          lowered)):
         return {"action": "navigate", "args": {"url": SITE_ALIASES[site]},
                 "say": f"Открываю {site}."}
 
@@ -126,7 +133,7 @@ def route(text: str) -> dict | None:
     # (живой прогон миссии 7: локальный поиск перехватывал фразу и отвечал «не нашлось поля»).
     web_hint = re.search(r"\b(в интернете|в сети|в гугле|погугли|из интернета)\b", lowered)
     match = re.search(r"\b(найди|поищи|search)\s+(.+)", lowered)
-    if match and not web_hint:
+    if match and not web_hint and not semantic_media:
         query = match.group(2).strip(" .,!?")
         if query:
             return {"action": "search", "args": {"query": query},

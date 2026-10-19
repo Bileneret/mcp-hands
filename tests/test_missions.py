@@ -103,3 +103,64 @@ def test_mission_registry_matches_approved_list():
     for number, mission in missions.MISSIONS.items():
         assert mission["phrase"] and callable(mission["verify"]), number
         assert mission["needs"], f"у миссии {number} не указано, что нужно для прогона"
+
+def test_semantic_media_phrases_leave_the_local_router():
+    """Фразы про «видео конкретного автора» не решаются локальными правилами.
+
+    Живой прогон 19.10: «найди на YouTube видео Майкла Наки и включи» уходило в
+    «открыть YouTube», а «свежая новостная сводка Майкла Наки» — в «включи новости»,
+    и на экране оказывались первые попавшиеся ролики.
+    """
+    from mcp_hands.assistant.router import route
+
+    assert route("Найди на YouTube видео Майкла Наки и включи его") is None
+    assert route("Включи свежую новостную сводку Майкла Наки, похожую на «ДЕНЬ…»") is None
+    # простые команды остаются мгновенными
+    assert route("включи ютуб")["action"] == "navigate"
+    assert route("включи новости")["action"] == "youtube"
+    assert route("найди погоду на неделю")["action"] == "search"
+    assert route("Найди на экран YouTube и открой его")["action"] == "navigate"
+
+
+def test_mission_four_requires_the_author(monkeypatch):
+    """Факт миссии 4 — видео ИМЕННО автора, а не «какое-то видео играет»."""
+    class Result:
+        def __init__(self, detail): self.detail, self.summary, self.ok = detail, "", True
+
+    monkeypatch.setattr(missions.ms, "live_video", lambda action="status": Result(
+        {"has_video": True, "paused": False, "title": "ДЕНЬ 300 — YouTube",
+         "channel": "Майкл Наки"}))
+    assert missions.check_video_by_author({})[0] is True
+
+    monkeypatch.setattr(missions.ms, "live_video", lambda action="status": Result(
+        {"has_video": True, "paused": False, "title": "Трамп не был готов — YouTube",
+         "channel": "Новости 24"}))
+    ok, evidence = missions.check_video_by_author({})
+    assert ok is False and "НЕ автор" in evidence
+
+    monkeypatch.setattr(missions.ms, "live_video", lambda action="status": Result(
+        {"has_video": True, "paused": True, "title": "ДЕНЬ 300", "channel": "Майкл Наки"}))
+    assert missions.check_video_by_author({})[0] is False
+
+
+def test_mission_five_needs_both_author_and_day_word(monkeypatch):
+    """«ДЕНЬ» ищется СЛОВОМ: подстрочный поиск ловил «одна/дня» и давал ложный успех."""
+    class Result:
+        def __init__(self, detail): self.detail, self.summary, self.ok = detail, "", True
+
+    def video(title, channel="Майкл Наки"):
+        monkeypatch.setattr(missions.ms, "live_video",
+                            lambda action="status": Result(
+                                {"has_video": True, "paused": False, "title": title,
+                                 "channel": channel}))
+
+    video("ДЕНЬ 512: что случилось — YouTube")
+    assert missions.check_video_day_summary({})[0] is True
+
+    video("(114) 😱 ТРАМП НЕ БЫЛ ГОТОВ К ТАКОМУ! — YouTube", channel="Новости 24")
+    ok, evidence = missions.check_video_day_summary({})
+    assert ok is False and "не Майкл Наки" in evidence
+
+    video("Одна история про санкции — YouTube")
+    ok, evidence = missions.check_video_day_summary({})
+    assert ok is False and "не та сводка" in evidence

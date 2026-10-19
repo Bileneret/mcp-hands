@@ -117,6 +117,79 @@ def check_video_playing(_result: dict) -> tuple[bool, str]:
     return False, status.summary[:80]
 
 
+def _video_facts(retries: int = 4, pause_s: float = 0.8) -> dict:
+    """Статус видео с ожиданием канала: страница видео отрисовывается не мгновенно."""
+    detail: dict = {}
+    for attempt in range(max(1, retries)):
+        detail = ms.live_video("status").detail or {}
+        if str(detail.get("channel", "")).strip() or attempt == retries - 1:
+            break
+        time.sleep(pause_s)
+    return detail
+
+
+def recipe_youtube_pick(query: str, title_contains: str = "",
+                        channel_contains: str = "") -> dict:
+    """Детерминированный рецепт: поиск в YouTube → выбор по признаку → воспроизведение.
+
+    Живой прогон 19.10 показал две вещи: LLM-план на такие цели идёт минутами и
+    выходит нестабильным, а нужный ролик выбирается по ЗАГОЛОВКУ/КАНАЛУ, а не по
+    «первому в выдаче». Рецепт делает ровно это — за секунды и повторяемо.
+    """
+    from urllib.parse import quote
+
+    if not (ms.live_browser(action="status").detail or {}).get("mode"):
+        ms.live_browser(action="connect_user")
+    ms.live_navigate(f"https://www.youtube.com/results?search_query={quote(query)}")
+    picked = ms.live_pick_video(title_contains=title_contains,
+                                channel_contains=channel_contains)
+    return {"ok": bool(picked.ok), "summary": picked.summary,
+            "detail": picked.detail if isinstance(picked.detail, dict) else {}}
+
+
+def check_video_by_author(result: dict, author: str = "наки") -> tuple[bool, str]:
+    """Миссия 4: играет видео ИМЕННО этого автора (канал/заголовок подтверждают).
+
+    Проверка «видео играет» пропускала любой ролик: живой прогон открыл первые
+    попавшиеся новости вместо Майкла Наки. Автор — часть факта, а не украшение.
+    """
+    detail = _video_facts()
+    title = str(detail.get("title", ""))
+    channel = str(detail.get("channel", ""))
+    playing = bool(detail.get("has_video")) and detail.get("paused") is False
+    if not playing:
+        return False, f"видео не играет (канал {channel!r})"
+    haystack = (title + " " + channel).lower()
+    if author in haystack:
+        return True, f"играет {channel or 'канал не прочитан'}: {title[:70]}"
+    return False, (f"играет НЕ автор {author!r}: канал {channel[:40]!r}, "
+                   f"ролик {title[:60]!r}")
+
+
+def check_video_day_summary(_result: dict) -> tuple[bool, str]:
+    """Миссия 5: играет видео, и это сводка Майкла Наки с «ДЕНЬ…» в заголовке.
+
+    Просто «видео играет» здесь мало: смысл миссии — выбрать НУЖНУЮ сводку,
+    поэтому в факт входит заголовок ролика.
+    """
+    detail = _video_facts()
+    title = str(detail.get("title", ""))
+    channel = str(detail.get("channel", ""))
+    playing = bool(detail.get("has_video")) and detail.get("paused") is False
+    if not playing:
+        return False, f"видео не играет (канал {channel!r})"
+    haystack = (title + " " + channel).lower()
+    # «день» — СЛОВОМ: подстрочный поиск дал ложное «достигнуто» на «одна/дня»
+    # (живой прогон 19.10 поймал это на ролике про Трампа).
+    by_author = "наки" in haystack
+    day_word = re.search(r"\bдень\b|\bдня\b|\bдней\b", haystack) is not None
+    if by_author and day_word:
+        return True, f"играет сводка: {title[:80]}"
+    if not by_author:
+        return False, f"играет не Майкл Наки: канал {channel[:40]!r}, ролик {title[:60]!r}"
+    return False, f"играет не та сводка (нет «ДЕНЬ…» в заголовке): {title[:80]}"
+
+
 def check_tabs_named(_result: dict) -> tuple[bool, str]:
     """Запасная: перечислить вкладки (миссии про наблюдение в браузере)."""
     tabs = ms.live_tabs()
@@ -216,9 +289,13 @@ MISSIONS: dict[int, dict] = {
                   "и подтверди, что открылся YouTube",
         "verify": check_youtube_opened, "needs": "свой видимый профиль браузера", "mode": "goal"},
     4: {"phrase": "Найди на YouTube видео Майкла Наки и включи его",
-        "verify": check_video_playing, "needs": "живой браузер (Opera)", "mode": "goal"},
+        "verify": check_video_by_author,
+        "needs": "живой браузер (Opera); видео обязан быть канал «Майкл Наки»",
+        "mode": "goal", "recipe": ("Майкл Наки", "", "Наки")},
     5: {"phrase": "Включи свежую новостную сводку Майкла Наки, похожую на «ДЕНЬ…»",
-        "verify": check_video_playing, "needs": "живой браузер (Opera)", "mode": "goal"},
+        "verify": check_video_day_summary,
+        "needs": "живой браузер (Opera); заголовок ролика должен содержать «ДЕНЬ»",
+        "mode": "goal", "recipe": ("Майкл Наки ДЕНЬ", "ДЕНЬ", "Наки")},
     6: {"phrase": "Открой Twitch и включи что-нибудь по моим интересам",
         "verify": check_video_playing, "needs": "живой браузер (Opera)", "mode": "goal"},
     7: {"phrase": "Найди в интернете, что такое MCP, и ответь коротко со ссылкой",
@@ -239,11 +316,13 @@ MISSIONS: dict[int, dict] = {
 
 
 def run_mission(number: int, assistant: Assistant, quiet: bool = True,
-                phrase: str | None = None) -> dict:
+                phrase: str | None = None, use_recipe: bool = False) -> dict:
     """Один прогон: фраза → маршрут ассистента → независимая проверка факта.
 
     `phrase` позволяет подставить конкретику (например, путь к папке для миссии 10),
     сохраняя смысл миссии: в записи видно и реестровую формулировку, и фактическую.
+    `use_recipe=True` идёт детерминированным рецептом миссии (без модели) — быстро и
+    повторяемо; факт всё равно проверяется независимо.
     """
     mission = MISSIONS[number]
     spoken = phrase or mission["phrase"]
@@ -252,16 +331,29 @@ def run_mission(number: int, assistant: Assistant, quiet: bool = True,
              "needs": mission["needs"], "ts": time.strftime("%Y-%m-%d %H:%M:%S")}
     answer: dict = {}
     entry["_docx_before"] = sorted(docx_snapshot())  # что было ДО прогона
-    try:
-        # Подсказку получает только маршрут цели: локальные интенты и ответы старшего
-        # мозга она не касается (иначе миссии-наблюдения потеряли бы свою скорость).
-        answer = assistant.handle(spoken, goal_hint=mission["needs"])
-        entry["route"] = answer.get("kind", "")
-        entry["say"] = str(answer.get("say", ""))[:200]
-        entry["tokens"] = int((answer.get("detail") or {}).get("tokens", 0) or 0)
-        entry["source"] = str((answer.get("detail") or {}).get("source", ""))
-    except Exception as exc:  # noqa: BLE001 — сбой прогона фиксируем, а не прячем
-        entry.update({"route": "error", "say": f"{type(exc).__name__}: {exc}"})
+    recipe = mission.get("recipe")
+    if use_recipe and recipe:
+        # Детерминированный путь: модель не участвует, секунды вместо минут (жалоба
+        # владельца «слишком долго и нестабильно» — отсюда и взялись рецепты).
+        try:
+            outcome = recipe_youtube_pick(*recipe)
+            entry["route"] = "recipe"
+            entry["source"] = "recipe"
+            entry["say"] = str(outcome.get("summary", ""))[:200]
+            entry["_recipe_detail"] = outcome.get("detail") or {}
+        except Exception as exc:  # noqa: BLE001 — сбой фиксируем, а не прячем
+            entry.update({"route": "error", "say": f"{type(exc).__name__}: {exc}"})
+    else:
+        try:
+            # Подсказку получает только маршрут цели: локальные интенты и ответы
+            # старшего мозга она не касается (наблюдения не теряют скорость).
+            answer = assistant.handle(spoken, goal_hint=mission["needs"])
+            entry["route"] = answer.get("kind", "")
+            entry["say"] = str(answer.get("say", ""))[:200]
+            entry["tokens"] = int((answer.get("detail") or {}).get("tokens", 0) or 0)
+            entry["source"] = str((answer.get("detail") or {}).get("source", ""))
+        except Exception as exc:  # noqa: BLE001 — сбой прогона фиксируем, а не прячем
+            entry.update({"route": "error", "say": f"{type(exc).__name__}: {exc}"})
     # Действия плана достаём отдельно от маршрута и с проверкой типа: у локального
     # ответа «summary» — строка, и падение на её разборе не должно выглядеть сбоем ответа.
     outline = (answer.get("detail") or {}).get("summary") if isinstance(answer.get("detail"),
@@ -327,6 +419,8 @@ def main() -> int:
     parser.add_argument("missions", nargs="*", type=int, help="номера миссий; пусто — список")
     parser.add_argument("--work", action="store_true",
                         help="свой профиль браузера (не трогать живой браузер владельца)")
+    parser.add_argument("--recipe", action="store_true",
+                        help="идти детерминированным рецептом (без модели; миссии 4–5)")
     parser.add_argument("--list", action="store_true", help="показать список миссий и выйти")
     args = parser.parse_args()
 
@@ -341,7 +435,7 @@ def main() -> int:
         if number not in MISSIONS:
             print(f"миссии {number} нет в реестре")
             continue
-        run_mission(number, assistant)
+        run_mission(number, assistant, use_recipe=args.recipe)
     print(f"\nсводка: {write_report()}")
     return 0
 

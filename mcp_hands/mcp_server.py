@@ -48,6 +48,7 @@ TOOL_NAMES = frozenset({
     "browser_tabs_audit", "browser_collect_sources",
     "browser_extract_text", "word_docx_to_pdf", "browser_video_capture",
     "live_browser", "live_navigate", "live_page", "live_search", "live_tabs",
+    "live_pick_video",
     "live_click_text", "live_video", "live_screenshot", "live_youtube",
     "click_text_on_screen", "scroll"})
 
@@ -1509,6 +1510,38 @@ def live_tabs() -> ToolResult:
                         summary=f"вкладок: {len(rows)}; рабочая: {ours.get('title', '—')[:60]}",
                         detail={"tabs": rows, "ours": ours, "count": len(rows)})
     _journal("live_tabs", started, result, {})
+    return result
+
+
+@server.tool(structured_output=True)
+def live_pick_video(title_contains: str = "", channel_contains: str = "") -> ToolResult:
+    """Открыть видео, ВЫБРАННОЕ по заголовку и/или каналу, а не первое в выдаче.
+
+    Нужен там, где важно не «какое-то видео», а конкретное: «сводка за ДЕНЬ N» — это
+    ролик с «ДЕНЬ» в заголовке (живой прогон открывал первое попавшееся). Работает на
+    текущей странице выдачи: сначала читает список ссылок, потом идёт по выбранной.
+    """
+    started = time.perf_counter()
+    browser = _live()
+    if not browser.mode:
+        return _fail("live_pick_video", started,
+                     "живой браузер не подключён: live_browser start/connect_user", True)
+    if not (title_contains or channel_contains):
+        return _fail("live_pick_video", started,
+                     "нужен хотя бы один признак: title_contains или channel_contains", True)
+    try:
+        outcome = browser.pick_video(title_contains=title_contains,
+                                     channel_contains=channel_contains)
+    except Exception as exc:  # noqa: BLE001
+        return _fail("live_pick_video", started, f"{type(exc).__name__}: {exc}")
+    result = ToolResult(ok=bool(outcome.get("ok")), refused=False,
+                        reason=outcome.get("reason", ""),
+                        summary=(f"выбрано: {(outcome.get('title') or '')[:70]}"
+                                 if outcome.get("ok") else
+                                 (outcome.get("reason", "")[:120])),
+                        detail=outcome)
+    _journal("live_pick_video", started, result,
+             {"title": title_contains, "channel": channel_contains})
     return result
 
 

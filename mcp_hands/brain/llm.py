@@ -135,6 +135,11 @@ SYSTEM_PROMPT_TEMPLATE = """Ты — планировщик компьютерн
   (карточки article.source), на обычных сайтах он бесполезен;
   разбор папки по типам → fs_sort_by_type(source=…, target_root=…);
   видео по запросу → live_youtube(query=…) с expect video_playing;
+  видео КОНКРЕТНОГО автора или сводка за конкретный день → live_navigate(youtube) →
+  live_search(query=«канал + признак», например «Майкл Наки ДЕНЬ») → live_pick_video(
+  title_contains=«ДЕНЬ», channel_contains=«Наки») с expect video_playing. live_youtube
+  здесь НЕ подходит: он открывает ПЕРВЫЙ результат, а нужен выбранный по признаку —
+  живой прогон открыл не ту сводку (новое видео вместо «ДЕНЬ …»);
   «открой сайт» → live_navigate с expect page_matches;
 - у каждого шага expect обязан относиться к ЕГО действию: не ставь page_matches
   на live_tabs (живой прогон миссии 9: план развалился именно на этом);
